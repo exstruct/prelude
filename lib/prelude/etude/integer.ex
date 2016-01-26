@@ -1,7 +1,7 @@
 defmodule Prelude.Etude.Integer do
-  import Prelude.Etude.Utils
+  use Prelude.Etude.Node
 
-  def exit({:integer, line, _} = node) do
-    ready(node, line)
+  def exit({:integer, line, value}, state) do
+    {{:integer, line, value}, state}
   end
 end

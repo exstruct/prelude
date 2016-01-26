@@ -1,60 +1,71 @@
 defmodule Prelude.Etude do
   def compile(forms, _opts) do
-    {exports, functions} = Enum.reduce(forms, {[], %{}}, &partition/2)
+    {attributes, exports, functions} = Enum.reduce(forms, {[], %{}, %{}}, &partition/2)
 
     initial_state = %{
       scopes: [],
-      locals: Map.keys(functions),
+      locals: Enum.reduce(functions, %{}, fn({key, _}, acc) -> Map.put(acc, key, true) end),
+      exports: exports,
       calls: %{}
     }
 
     functions
-    |> Enum.reduce({[], [etude_default_clause()]}, &handle_function(&1, initial_state, &2))
-    |> concat(exports)
+    |> Enum.reduce({[], [], []}, &handle_function(&1, initial_state, &2))
+    |> concat(attributes)
     |> IO.inspect
   end
 
-  defp partition({:function, _, name, arity, clauses}, {exports, funs}) do
+  defp partition({:function, _, name, arity, clauses}, {attributes, exports, funs}) do
     key = {name, arity}
     prev = Map.get(funs, key, [])
-    {exports, Map.put(funs, key, prev ++ clauses)}
+    {attributes, exports, Map.put(funs, key, prev ++ clauses)}
   end
-  defp partition(other, {exports, funs}) do
-    {[other | exports], funs}
+  defp partition({:attribute, _, :export, exported} = attr, {attributes, exports, funs}) do
+    exports = Enum.reduce(exported, exports, fn({name, arity}, acc) ->
+      Map.put(acc, {name, arity}, true)
+    end)
+    {[attr | attributes], exports, funs}
+  end
+  defp partition(other, {attributes, exports, funs}) do
+    {[other | attributes], exports, funs}
   end
 
-  defp handle_function({{name, arity}, clauses}, state, {functions, etudes}) do
-    state = Map.merge(state, %{function: {name, arity}})
-    {f, e} = Prelude.ErlSyntax.traverse({:function, -1, name, arity, clauses}, state, traverse(:enter), traverse(:exit))
-    {[f | functions], [e | etudes]}
+  defp handle_function({{name, arity}, clauses}, state, {functions, public_etudes, private_etudes}) do
+    state = state
+    |> Map.merge(%{function: {name, arity},
+                   public: Map.has_key?(state.exports, {name, arity})})
+
+    enter = Prelude.Etude.Node.traverse_fn(:enter)
+    exit = Prelude.Etude.Node.traverse_fn(:exit)
+    node = {:function, -1, name, arity, clauses}
+
+    {additional_functions, {additional_public, additional_private}} = Prelude.ErlSyntax.traverse(node, state, enter, exit)
+
+    {functions ++ additional_functions,
+     public_etudes ++ additional_public,
+     private_etudes ++ additional_private}
   end
 
-  defp concat({functions, etudes}, exports) do
-    Enum.reverse(exports) ++ functions ++ [{:function, 1, :__etude__, 3, etudes}]
+  defp concat({functions, public_etudes, private_etudes}, attributes) do
+    export_etudes(attributes)
+    ++ functions
+    ++ handle_etudes(:__etude__, public_etudes)
+    ++ handle_etudes(:__etude_local__, private_etudes)
+  end
+
+  defp export_etudes(attributes) do
+    [{:attribute, -1, :export, [__etude__: 3]} | attributes]
+    |> Enum.reverse()
+  end
+
+  defp handle_etudes(_, []) do
+    []
+  end
+  defp handle_etudes(name, etudes) do
+    [{:function, -1, name, 3, Enum.reverse([etude_default_clause | etudes])}]
   end
 
   defp etude_default_clause do
     {:clause, -1, [{:var, -1, :_}, {:var, -1, :_}, {:var, -1, :_}], [], [{:atom, -1, nil}]}
-  end
-
-  defp node_to_module(node) do
-    mod = Module.concat(__MODULE__, node |> elem(0) |> :erlang.atom_to_binary(:utf8) |> Mix.Utils.camelize)
-    mod.module_info()
-    mod
-  end
-
-  defp traverse(name) do
-    fn(node, acc) ->
-      mod = node_to_module(node)
-      cond do
-        function_exported?(mod, name, 2) ->
-          apply(mod, name, [node, acc])
-        function_exported?(mod, name, 1) ->
-          node = apply(mod, name, [node])
-          {node, acc}
-        true ->
-          {node, acc}
-      end
-    end
   end
 end

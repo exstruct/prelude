@@ -1,33 +1,44 @@
 defmodule Prelude.Etude.Function do
-  import Prelude.Etude.Utils
+  use Prelude.Etude.Node
 
-  def exit({:function, line, name, arity, clauses}, acc) do
+  def exit({:function, line, name, arity, clauses}, %{public: true} = state) do
     {
-      entry(name, arity),
-      etude_clause(name, arity, clauses)
+      [public_entry(name, arity)],
+      {[etude_clause(name, arity, clauses, state)],
+       []}
+    }
+  end
+  def exit({:function, line, name, arity, clauses}, state) do
+    {
+      [],
+      {[],
+       [etude_clause(name, arity, clauses, state)]}
     }
   end
 
-  defp entry(name, arity) do
+  # function(Arg1, Arg2) ->
+  #   'Elixir.Etude':resolve(
+  #     ('__etude__'(function, 2, 'Elixir.Etude.Dispatch':from_process()))#{arguments => [Arg1, Arg2]}).
+
+  defp public_entry(name, arity) do
     {args, cons} = args(arity)
     {:function, -1, name, arity,
       [{:clause, -1, args, [],
-        [{:call, -1, {:remote, -1, {:atom, -1, Etude.Thunk}, {:atom, -1, :resolve}},
+        [{:call, -1, {:remote, -1, {:atom, -1, Etude}, {:atom, -1, :resolve}},
           [{:map, -1,
-            [{:map_field_assoc, -1, {:atom, -1, :__struct__},
-              {:atom, -1, Etude.Thunk.Continuation}},
-             {:map_field_assoc, -1, {:atom, -1, :function},
-              {:call, -1, {:atom, -1, :__etude__},
-               [{:atom, -1, name}, {:integer, -1, arity},
-                {:call, -1,
-                 {:remote, -1, {:atom, -1, Etude.Dispatch},
-                  {:atom, -1, :from_process}}, []}]}},
-             {:map_field_assoc, -1, {:atom, -1, :arguments}, cons}]}]}]}]}
+            {:call, -1, {:atom, -1, :__etude__},
+             [{:atom, -1, name}, {:integer, -1, arity},
+              {:call, -1,
+               {:remote, -1, {:atom, -1, Etude.Dispatch}, {:atom, -1, :from_process}},
+               []}]},
+            [{:map_field_assoc, -1, {:atom, -1, :arguments},
+              cons}]}]}]}]}
   end
 
-  defp etude_clause(name, arity, clauses) do
-    {:clause, -1, [{:atom, -1, name}, {:integer, -1, arity}, {:var, -1, :__Dispatch}], [], [
-      {:named_fun, -1, :_Exec, clauses}]}
+  defp etude_clause(name, arity, clauses, _state) do
+    ## TODO pull the calls into here
+    {:clause, -1, [{:atom, -1, name}, {:integer, -1, arity}, {:var, -1, :__Dispatch}], [],
+      [{:named_fun, -1, :__etude_recurse__, clauses}]}
   end
 
   defp args(0) do

@@ -1,7 +1,7 @@
 defmodule Prelude.Etude.Nil do
-  import Prelude.Etude.Utils
+  use Prelude.Etude.Node
 
-  def exit({:nil, line} = node) do
-    ready(node, line)
+  def exit({:nil, line}, state) do
+    {{:nil, line}, state}
   end
 end

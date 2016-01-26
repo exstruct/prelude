@@ -11,6 +11,21 @@ defmodule Prelude.ErlSyntax do
     end
   end
 
+  def parse(s) do
+    {:ok, tokens, _} = s |> to_string() |> to_char_list |> :erl_scan.string()
+
+    {forms, _} = Enum.reduce(tokens, {[], []}, fn
+      ({:dot, _} = dot, {forms, acc}) ->
+        {:ok, form} = :erl_parse.parse_form(:lists.reverse([dot | acc]))
+        {[form | forms], []}
+      (token, {forms, acc}) ->
+        {forms, [token | acc]}
+    end)
+
+    forms
+    |> Enum.reverse()
+  end
+
   defp apply_unquote(tree) do
     tree
     |> Macro.escape()

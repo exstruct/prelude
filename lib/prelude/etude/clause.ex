@@ -1,12 +1,7 @@
 defmodule Prelude.Etude.Clause do
-  import Prelude.Etude.Utils
+  use Prelude.Etude.Node
 
-  def enter({:clause, _, matches, _, _} = node, %{scopes: scopes} = acc) do
-    scopes = [Enum.flat_map(matches, &extract_vars/1) | scopes]
-    {node, %{acc | scopes: scopes}}
-  end
-
-  def exit(node, %{scopes: [_ | scopes]} = acc) do
-    {node, %{acc | scopes: scopes}}
+  def exit({:clause, line, matches, one, two}, state) do
+    {{:clause, line, matches, one, two}, state}
   end
 end

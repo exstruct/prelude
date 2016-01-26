@@ -1,10 +1,7 @@
 defmodule Prelude.Etude.MapFieldAssoc do
-  import Prelude.Etude.Utils
+  use Prelude.Etude.Node
 
-  def exit({:map_field_assoc, line, ready(key), ready(value)}) do
-    ready({:map_field_assoc, line, key, value}, line)
-  end
-  def exit(node) do
-    node
+  def exit({:map_field_assoc, line, key, value}, state) do
+    {{:map_field_assoc, line, key, value}, state}
   end
 end

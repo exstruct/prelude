@@ -1,7 +1,7 @@
 defmodule Prelude.Etude.Atom do
-  import Prelude.Etude.Utils
+  use Prelude.Etude.Node
 
-  def exit({:atom, line, _} = node) do
-    ready(node, line)
+  def exit({:atom, line, value}, state) do
+    {{:atom, line, value}, state}
   end
 end

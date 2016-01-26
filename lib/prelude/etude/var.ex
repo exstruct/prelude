@@ -1,12 +1,7 @@
 defmodule Prelude.Etude.Var do
-  import Prelude.Etude.Utils
-  import Prelude.ErlSyntax
+  use Prelude.Etude.Node
 
-  def exit(node, acc) do
-    if in_scope?(node, acc.scopes) do
-      {ready(node, -1), acc}
-    else
-      {~e[(unquote(node))()], acc}
-    end
+  def exit({:var, line, name}, state) do
+    {{:var, line, name}, state}
   end
 end

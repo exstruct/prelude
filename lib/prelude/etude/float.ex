@@ -1,7 +1,7 @@
 defmodule Prelude.Etude.Float do
-  import Prelude.Etude.Utils
+  use Prelude.Etude.Node
 
-  def exit({:float, line, _} = node) do
-    ready(node, line)
+  def exit({:float, line, value}, state) do
+    {{:float, line, value}, state}
   end
 end

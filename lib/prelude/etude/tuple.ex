@@ -1,12 +1,7 @@
 defmodule Prelude.Etude.Tuple do
-  import Prelude.Etude.Utils
+  use Prelude.Etude.Node
 
-  def exit({:tuple, line, children}) do
-    case extract_pending(children) do
-      {children, []} ->
-        ready({:tuple, line, children}, line)
-      {children, pending_ops} ->
-        compile_pending(pending_ops, line, {:tuple, line, children})
-    end
+  def exit({:tuple, line, children}, state) do
+    {{:tuple, line, children}, state}
   end
 end

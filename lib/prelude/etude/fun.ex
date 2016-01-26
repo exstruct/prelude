@@ -1,6 +1,8 @@
 defmodule Prelude.Etude.Fun do
-  def exit(node, acc) do
+  use Prelude.Etude.Node
+
+  def exit(node, state) do
     ## TODO
-    {node, acc}
+    {node, state}
   end
 end

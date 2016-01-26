@@ -1,6 +1,8 @@
 defmodule Prelude.Etude.Remote do
+  use Prelude.Etude.Node
+
   ## noop
-  def exit(node, acc) do
-    {node, acc}
+  def exit(node, state) do
+    {node, state}
   end
 end
