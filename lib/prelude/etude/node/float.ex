@@ -1,4 +1,4 @@
-defmodule Prelude.Etude.Float do
+defmodule Prelude.Etude.Node.Float do
   use Prelude.Etude.Node
 
   def exit({:float, line, value}, state) do

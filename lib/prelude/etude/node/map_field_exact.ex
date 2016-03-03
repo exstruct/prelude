@@ -1,4 +1,4 @@
-defmodule Prelude.Etude.MapFieldExact do
+defmodule Prelude.Etude.Node.MapFieldExact do
   use Prelude.Etude.Node
 
   def exit({:map_field_exact, line, key, value}, state) do

@@ -1,4 +1,4 @@
-defmodule Prelude.Etude.Clause do
+defmodule Prelude.Etude.Node.Clause do
   use Prelude.Etude.Node
 
   def exit({:clause, line, matches, one, two}, state) do

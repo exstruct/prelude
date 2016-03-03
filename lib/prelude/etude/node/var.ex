@@ -1,4 +1,4 @@
-defmodule Prelude.Etude.Var do
+defmodule Prelude.Etude.Node.Var do
   use Prelude.Etude.Node
 
   def exit({:var, line, name}, state) do

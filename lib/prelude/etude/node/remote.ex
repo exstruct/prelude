@@ -1,4 +1,4 @@
-defmodule Prelude.Etude.Remote do
+defmodule Prelude.Etude.Node.Remote do
   use Prelude.Etude.Node
 
   ## noop

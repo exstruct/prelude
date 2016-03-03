@@ -2,11 +2,9 @@ defmodule Prelude.Etude do
   def compile(forms, _opts) do
     {attributes, exports, functions} = Enum.reduce(forms, {[], %{}, %{}}, &partition/2)
 
-    initial_state = %{
-      scopes: [],
+    initial_state = %Prelude.Etude.State{
       locals: Enum.reduce(functions, %{}, fn({key, _}, acc) -> Map.put(acc, key, true) end),
       exports: exports,
-      calls: %{}
     }
 
     functions
@@ -31,9 +29,8 @@ defmodule Prelude.Etude do
   end
 
   defp handle_function({{name, arity}, clauses}, state, {functions, public_etudes, private_etudes}) do
-    state = state
-    |> Map.merge(%{function: {name, arity},
-                   public: Map.has_key?(state.exports, {name, arity})})
+    state = %{state | function: {name, arity},
+                       public?: Map.has_key?(state.exports, {name, arity})}
 
     enter = Prelude.Etude.Node.traverse_fn(:enter)
     exit = Prelude.Etude.Node.traverse_fn(:exit)
@@ -67,5 +64,9 @@ defmodule Prelude.Etude do
 
   defp etude_default_clause do
     {:clause, -1, [{:var, -1, :_}, {:var, -1, :_}, {:var, -1, :_}], [], [{:atom, -1, nil}]}
+  end
+
+  defmodule Etude do
+
   end
 end

@@ -1,9 +1,7 @@
 defmodule Prelude.ErlSyntax do
   defmacro sigil_e(string, _opts) do
     {string, _} = Code.eval_quoted(string, [], __CALLER__)
-    {:ok, tokens, _} = string |> String.to_char_list |> :erl_scan.string()
-    tokens = tokens |> Enum.map(&put_elem(&1, 1, -1))
-    case :erl_parse.parse_exprs(tokens ++ [dot: -1]) do
+    case parse_expr(string) do
       {:ok, [tree]} ->
         apply_unquote(tree)
       {:ok, tree} ->
@@ -24,6 +22,12 @@ defmodule Prelude.ErlSyntax do
 
     forms
     |> Enum.reverse()
+  end
+
+  def parse_expr(s) do
+    {:ok, tokens, _} = s |> String.to_char_list |> :erl_scan.string()
+    tokens = tokens |> Enum.map(&put_elem(&1, 1, -1))
+    :erl_parse.parse_exprs(tokens ++ [dot: -1])
   end
 
   defp apply_unquote(tree) do

@@ -1,4 +1,4 @@
-defmodule Prelude.Etude.Try do
+defmodule Prelude.Etude.Node.Fun do
   use Prelude.Etude.Node
 
   def exit(node, state) do

@@ -18,8 +18,11 @@ defmodule Prelude.Test.Case do
         {:ok, mod, bin} = defetude unquote(actual), unquote([body])
         :code.load_binary(mod, __ENV__.file |> to_char_list(), bin)
 
-        ## TODO remove this once we get more done
-        {:__ETUDE_READY__, var!(value)} = mod.test()
+        dispatch = Etude.Dispatch.Fallback
+        state = %Etude.State{mailbox: self()}
+
+        {var!(value), _} = mod.__etude__(:test, 0, dispatch)
+        |> Etude.resolve(state)
 
         assert var!(value) == unquote(expected).test()
 

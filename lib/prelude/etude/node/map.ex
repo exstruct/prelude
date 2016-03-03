@@ -1,4 +1,4 @@
-defmodule Prelude.Etude.Map do
+defmodule Prelude.Etude.Node.Map do
   use Prelude.Etude.Node
 
   def exit({:map, line, children}, state) do

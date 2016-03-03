@@ -1,4 +1,4 @@
-defmodule Prelude.Etude.Integer do
+defmodule Prelude.Etude.Node.Integer do
   use Prelude.Etude.Node
 
   def exit({:integer, line, value}, state) do
