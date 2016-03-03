@@ -24,6 +24,10 @@ defmodule Prelude do
     Prelude.Compiler.compile_erlang(forms, opts)
   end
 
+  def parse_transform(forms, _options) do
+    compile_forms(forms, [out: :forms])
+  end
+
   defmacro defetude(name, block) do
     quote bind_quoted: [name: Macro.escape(name),
                         block: Macro.escape(block)] do

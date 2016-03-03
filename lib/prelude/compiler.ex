@@ -9,7 +9,7 @@ defmodule Prelude.Compiler do
     forms
     |> backend.compile(opts)
     |> pp()
-    |> to_beam(opts)
+    |> compile(opts)
   end
 
   defp pp(forms) do
@@ -22,6 +22,15 @@ defmodule Prelude.Compiler do
   end
   defp module_name([_ | rest]) do
     module_name(rest)
+  end
+
+  defp compile(forms, opts) do
+    case opts[:out] do
+      :forms ->
+        forms
+      _ ->
+        to_beam(forms, opts)
+    end
   end
 
   defp to_beam(forms, opts) do

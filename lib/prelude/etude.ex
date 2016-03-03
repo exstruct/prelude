@@ -10,7 +10,6 @@ defmodule Prelude.Etude do
     functions
     |> Enum.reduce({[], [], []}, &handle_function(&1, initial_state, &2))
     |> concat(attributes)
-    |> IO.inspect
   end
 
   defp partition({:function, _, name, arity, clauses}, {attributes, exports, funs}) do
@@ -64,9 +63,5 @@ defmodule Prelude.Etude do
 
   defp etude_default_clause do
     {:clause, -1, [{:var, -1, :_}, {:var, -1, :_}, {:var, -1, :_}], [], [{:atom, -1, nil}]}
-  end
-
-  defmodule Etude do
-
   end
 end

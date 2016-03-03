@@ -3,9 +3,9 @@ defmodule Prelude.Mixfile do
 
   def project do
     [app: :prelude,
-     version: "0.1.0",
+     version: "0.0.1",
      elixir: "~> 1.0",
-     description: "etude compiler",
+     description: "a preprocessor/compiler toolset for erlang and elixir",
      deps: deps,
      package: package,
      aliases: aliases]
@@ -24,7 +24,8 @@ defmodule Prelude.Mixfile do
   end
 
   defp deps do
-    [{:excheck, "~> 0.2.3", only: [:dev, :test, :bench]},
+    [{:etude, "1.0.0-beta.0"},
+     {:excheck, "~> 0.2.3", only: [:dev, :test, :bench]},
      {:triq, github: "krestenkrab/triq", only: [:dev, :test, :bench]},
      {:benchfella, "~> 0.2.0", only: [:dev, :test, :bench]},
      {:parse_trans, "~> 2.9.0", only: [:dev, :test, :bench]},
