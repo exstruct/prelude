@@ -7,9 +7,6 @@ defmodule Prelude.Etude.Node do
     end
   end
 
-  @ready Module.concat(__MODULE__, :__PRELUDE_READY__)
-  @pending Module.concat(__MODULE__, :__PRELUDE_PENDING__)
-
   def traverse_fn(name) do
     fn(node, acc) ->
       mod = impl_for(node)
@@ -41,6 +38,29 @@ defmodule Prelude.Etude.Node do
     |> Mix.Utils.camelize()
   end
 
+  def acc_pending(value, state, pending) do
+    if ready?(value, state) do
+      {value, pending}
+    else
+      value = unwrap(value)
+      var = var_for_node(value)
+      {var, [{var, value} | pending]}
+    end
+  end
+
+  def extract_pending(pending) do
+    {values, vars, _} = Enum.reduce(pending, {[], [], %{}}, fn
+      ({var, value}, {values, vars, cache}) ->
+        var_key = put_elem(var, 1, -1)
+        if Map.get(cache, var_key) do
+          {values, vars, cache}
+        else
+          {[value | values], [var | vars], Map.put(cache, var_key, true)}
+        end
+    end)
+    {values, vars}
+  end
+
   def put_arguments(call, arguments) when is_list(arguments) do
     put_arguments(call, cons(arguments))
   end
@@ -58,36 +78,44 @@ defmodule Prelude.Etude.Node do
     {:nil, -1}
   end
   def cons([argument | arguments]) do
-    {:cons, -1, argument, cons(arguments)}
+    {:cons, -1, unwrap(argument), cons(arguments)}
   end
 
-  defmacro ready(node \\ Macro.var(:_, nil)) do
-    quote do
-      {unquote(@ready), unquote(node)}
-    end
+  def wrap({:__ETUDE_THUNK__, _, _} = node) do
+    node
+  end
+  def wrap(node) do
+    {:__ETUDE_THUNK__, -1, node}
   end
 
-  defmacro pending(node \\ Macro.var(:_, nil)) do
-    quote do
-      {unquote(@pending), unquote(node)}
-    end
+  def unwrap({:__ETUDE_THUNK__, _, node}) do
+    node
+  end
+  def unwrap(list) when is_list(list) do
+    Enum.map(list, &unwrap/1)
+  end
+  def unwrap(node) do
+    node
   end
 
-  def extract_pending(list, _state) do
-    ## lookup ready variables in the scope in state
-    {children, pending} = Enum.map_reduce(list, [], fn
-      (pending(value), acc) ->
-        {var_for_node(value), [value | acc]}
-      (ready(value), acc) ->
-        {value, acc}
-      (value, acc) ->
-        {value, acc}
-    end)
-    {children, pending |> Enum.uniq() |> Enum.reverse()}
+  def ready?({:__ETUDE_THUNK__, _, _}, _state) do
+    false
+  end
+  def ready?(value, _state) when is_atom(value) do
+    true
+  end
+  def ready?(node, _state) do
+    true
   end
 
+  ## TODO normalize line numbers so we can have consistent names
   def var_for_node(node) do
     line = elem(node, 1)
+    node = put_elem(node, 1, -1)
     {:var, line, :"_etude_#{:erlang.phash2(node)}"}
+  end
+
+  def etude_dispatch do
+    {:var, -1, :__etude_dispatch__}
   end
 end

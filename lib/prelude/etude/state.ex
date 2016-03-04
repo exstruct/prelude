@@ -22,4 +22,9 @@ defmodule Prelude.Etude.State do
     fn_alias = {:var, -1, :"#{function}/#{arity}"}
     {fn_alias, %{state | local_calls: Map.put(calls, {function, arity}, fn_alias)}}
   end
+
+  def static_var?(_state, _var) do
+    # TODO
+    false
+  end
 end

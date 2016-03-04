@@ -9,7 +9,7 @@ defmodule Prelude.Test.Compiler do
     def read(conn, id) when is_integer(id) do
       read(conn, id |> to_string())
     end
-    def read(conn, id) do
+    def read(_conn, id) do
       user = Users.read(id)
       hello(user)
     end

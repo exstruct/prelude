@@ -38,8 +38,8 @@ do_compile(Line, Module, Block, Vars, E) ->
   {Data, Defs, Clas, Ref} = build(Line, File, Module, Docs, ?m(E, lexical_tracker)),
 
   try
-    {_, NE} = eval_form(Line, Module, Data, Block, Vars, E),
-    {Def, Defp, Defmacro, Defmacrop, Exports, Functions} =
+    {_, _NE} = eval_form(Line, Module, Data, Block, Vars, E),
+    {_Def, _Defp, _Defmacro, _Defmacrop, Exports, Functions} =
       elixir_def:unwrap_definitions(File, Module),
 
     Location = {elixir_utils:characters_to_list(elixir_utils:relative_to_cwd(File)), Line},

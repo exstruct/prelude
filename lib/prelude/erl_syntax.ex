@@ -1,11 +1,15 @@
 defmodule Prelude.ErlSyntax do
-  defmacro sigil_e(string, _opts) do
-    {string, _} = Code.eval_quoted(string, [], __CALLER__)
+  defmacro erl(string, line \\ -1) do
+    sigil(string, line, __CALLER__)
+  end
+
+  defp sigil(string, line, caller) do
+    {string, _} = Code.eval_quoted(string, [], caller)
     case parse_expr(string) do
       {:ok, [tree]} ->
-        apply_unquote(tree)
+        apply_unquote(tree, line)
       {:ok, tree} ->
-        apply_unquote({:block, -1, tree})
+        apply_unquote({:block, -1, tree}, line)
     end
   end
 
@@ -30,7 +34,7 @@ defmodule Prelude.ErlSyntax do
     :erl_parse.parse_exprs(tokens ++ [dot: -1])
   end
 
-  defp apply_unquote(tree) do
+  defp apply_unquote(tree, line) do
     tree
     |> Macro.escape()
     |> Macro.postwalk(fn
@@ -38,6 +42,8 @@ defmodule Prelude.ErlSyntax do
         [:call, _, {:{}, _, [:atom, _, :unquote]},
          [{:{}, _, [:atom, _, name]}]]}) ->
         Macro.var(name, nil)
+      ({:{}, l, [name, prev | rest]}) when is_integer(prev) ->
+        {:{}, l, [name, line | rest]}
       (other) ->
         other
     end)
@@ -56,6 +62,12 @@ defmodule Prelude.ErlSyntax do
   end
   def traverse({:tree, type, _, _} = tree, acc, _enter, _exit) when type in [:class_qualifier, :conjunction, :disjunction, :operator, :size_qualifier] do
     {tree, acc}
+  end
+  def traverse({:cons, _, _, _} = node, acc, enter, exit) do
+    {{:cons, line, value, tail}, acc} = enter.(node, acc)
+    {value, acc} = traverse(value, acc, enter, exit)
+    {tail, acc} = traverse(tail, acc, enter, exit)
+    exit.({:cons, line, value, tail}, acc)
   end
   def traverse({type, _, _, _, _} = node, acc, enter, exit) when type in [:clause, :function] do
     {{type, line, name, arity, clauses}, acc} = enter.(node, acc)

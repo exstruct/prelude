@@ -28,7 +28,7 @@ defmodule Prelude.Etude.Node.Function do
 
   defp compile_etude_clause(name, arity, clauses, state) do
     calls = compile_calls(state) ++ compile_local_calls(state)
-    {:clause, -1, [{:atom, -1, name}, {:integer, -1, arity}, __etude_dispatch__], [],
+    {:clause, -1, [{:atom, -1, name}, {:integer, -1, arity}, etude_dispatch], [],
       calls ++ [compile_etude_thunk(clauses, state)]}
   end
 
@@ -60,21 +60,17 @@ defmodule Prelude.Etude.Node.Function do
         {:call, -1, {:atom, -1, :__etude_local__}, [
           {:atom, -1, function},
           {:integer, -1, arity},
-          __etude_dispatch__
+          etude_dispatch
       ]}}
     end)
   end
 
   defp compile_dispatch_lookup(module, function, arity) do
-    {:call, -1, {:remote, -1, __etude_dispatch__, {:atom, -1, :resolve}}, [
+    {:call, -1, {:remote, -1, etude_dispatch, {:atom, -1, :resolve}}, [
       {:atom, -1, module},
       {:atom, -1, function},
       {:integer, -1, arity}
     ]}
-  end
-
-  defp __etude_dispatch__ do
-    {:var, -1, :__etude_dispatch__}
   end
 
   defp args(0) do
