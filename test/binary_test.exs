@@ -23,7 +23,7 @@ defmodule Prelude.Test.Binary do
 
   preludetest "construction" do
     def test() do
-      size = :erlang.div(64, 2)
+      size = :erlang.hd([32])
       <<"h", 1 :: integer-little-size(size)>>
     end
   end

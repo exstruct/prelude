@@ -104,7 +104,7 @@ defmodule Prelude.Etude.Node do
   def ready?(value, _state) when is_atom(value) do
     true
   end
-  def ready?(node, _state) do
+  def ready?(_node, _state) do
     true
   end
 

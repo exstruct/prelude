@@ -1,14 +1,14 @@
 defmodule Prelude.Etude.Node.Function do
   use Prelude.Etude.Node
 
-  def exit({:function, line, name, arity, clauses}, %{public?: true} = state) do
+  def exit({:function, _line, name, arity, clauses}, %{public?: true} = state) do
     {
       [compile_public_entry(name, arity)],
       {[compile_etude_clause(name, arity, clauses, state)],
        []}
     }
   end
-  def exit({:function, line, name, arity, clauses}, state) do
+  def exit({:function, _line, name, arity, clauses}, state) do
     {
       [],
       {[],

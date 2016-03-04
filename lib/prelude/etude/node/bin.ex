@@ -1,8 +1,6 @@
 defmodule Prelude.Etude.Node.Bin do
   use Prelude.Etude.Node
 
-  # @static_children [:atom, :float, :integer, :nil, :string]
-
   def exit({:bin, line, children}, state) do
     {process_children(line, children, state), state}
   end

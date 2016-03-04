@@ -1,7 +1,7 @@
 defmodule Prelude.Etude.Node.Call do
   use Prelude.Etude.Node
 
-  def exit({:call, line, {:remote, rl, module, function}, args}, state) do
+  def exit({:call, line, {:remote, _, module, function}, args}, state) do
     {_, acc} = acc_pending(module, state, [])
     {_, acc} = acc_pending(function, state, acc)
     module = unwrap(module)
@@ -11,7 +11,7 @@ defmodule Prelude.Etude.Node.Call do
       [] ->
         {fun, state} = State.put_call(state, elem(module, 2), elem(function, 2), args)
         {wrap(put_arguments(fun, args)), state}
-      pending ->
+      _ ->
         arguments = cons(args)
 
         ast = erl(~S"""
@@ -25,7 +25,7 @@ defmodule Prelude.Etude.Node.Call do
         {ast, state}
     end
   end
-  def exit({:call, line, fun, args}, state) do
+  def exit({:call, _line, fun, args}, state) do
     ## TODO
     case fun do
       {:atom, _, fun} ->
