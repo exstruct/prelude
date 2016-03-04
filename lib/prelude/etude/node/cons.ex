@@ -1,16 +1,16 @@
 defmodule Prelude.Etude.Node.Cons do
   use Prelude.Etude.Node
 
-  def exit({:cons, line, value, tail}, state) do
-    value = unwrap(value)
+  def exit({:cons, line, head, tail}, state) do
+    head = unwrap(head)
     tail_u = unwrap(tail)
 
     node = if ready?(tail, state) do
-      {:cons, line, value, tail_u}
+      {:cons, line, head, tail_u}
     else
       erl(~S"""
       #{'__struct__' => 'Elixir.Prelude.Etude.Node.Cons.Thunk',
-        value => unquote(value),
+        head => unquote(head),
         tail => unquote(tail_u)}
       """, line)
       |> wrap()
@@ -21,14 +21,14 @@ defmodule Prelude.Etude.Node.Cons do
 end
 
 defmodule Prelude.Etude.Node.Cons.Thunk do
-  defstruct value: nil,
+  defstruct head: nil,
             tail: nil
 end
 
 defimpl Etude.Thunk, for: Prelude.Etude.Node.Cons.Thunk do
-  def resolve(%{value: value, tail: tail}, state) do
+  def resolve(%{head: head, tail: tail}, state) do
     Etude.Thunk.resolve(tail, state, fn(tail, state) ->
-      {[value | tail], state}
+      {[head | tail], state}
     end)
   end
 end

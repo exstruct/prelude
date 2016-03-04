@@ -43,7 +43,6 @@ defmodule Prelude.Test.CaseExpr do
     end
   end
 
-  @tag :pending
   preludetest "when" do
     def test() do
       var = "Hello"
