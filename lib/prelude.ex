@@ -3,7 +3,7 @@ defmodule Prelude do
 
   def compile_string(str, opts \\ []) do
     str
-    |> Code.string_to_quoted!(str, opts)
+    |> Code.string_to_quoted!(opts)
     |> compile_quoted(opts)
   end
 

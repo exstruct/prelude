@@ -44,7 +44,12 @@ defmodule Prelude.Compiler do
   end
 
   def eval_forms(erl, env, scope) do
-    {parsed_binding, _} = :elixir_scope.load_binding([], scope)
+    parsed_binding = case :elixir_scope.load_binding([], scope) do
+      {binding, _, _} ->
+        binding
+      {binding, _} ->
+        binding
+    end
     {:value, value, _} = erl_eval(erl, parsed_binding, env)
     value
   end

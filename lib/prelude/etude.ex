@@ -18,8 +18,11 @@ defmodule Prelude.Etude do
     {attributes, exports, Map.put(funs, key, prev ++ clauses)}
   end
   defp partition({:attribute, _, :export, exported} = attr, {attributes, exports, funs}) do
-    exports = Enum.reduce(exported, exports, fn({name, arity}, acc) ->
-      Map.put(acc, {name, arity}, true)
+    exports = Enum.reduce(exported, exports, fn
+      ({:__struct__, 0}, acc) ->
+        acc
+      ({name, arity}, acc) ->
+        Map.put(acc, {name, arity}, true)
     end)
     {[attr | attributes], exports, funs}
   end
@@ -27,6 +30,12 @@ defmodule Prelude.Etude do
     {[other | attributes], exports, funs}
   end
 
+  defp handle_function({{:__struct__, 0}, clauses}, _state, {functions, public_etudes, private_etudes}) do
+    function = {:function, -1, :__struct__, 0, clauses}
+    {functions ++ [function],
+     public_etudes,
+     private_etudes}
+  end
   defp handle_function({{name, arity}, clauses}, state, {functions, public_etudes, private_etudes}) do
     state = %{state | function: {name, arity},
                        public?: Map.has_key?(state.exports, {name, arity})}
@@ -42,6 +51,11 @@ defmodule Prelude.Etude do
      private_etudes ++ additional_private}
   end
 
+  defp concat({functions, [], private_etudes}, attributes) do
+    Enum.reverse(attributes)
+    ++ functions
+    ++ handle_etudes(:__etude_local__, private_etudes)
+  end
   defp concat({functions, public_etudes, private_etudes}, attributes) do
     export_etudes(attributes)
     ++ functions

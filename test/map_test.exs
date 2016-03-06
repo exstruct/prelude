@@ -19,4 +19,26 @@ defmodule Prelude.Test.Map do
       %{map | "hello" => "Joe"}
     end
   end
+
+  preludetest "variable keys" do
+    def test() do
+      key = :erlang.hd(["foo"])
+      %{key => "bar"}
+    end
+  end
+
+  preludetest "update variable map" do
+    def test() do
+      map = :erlang.hd([%{"hello" => "Robert"}])
+      %{map | "hello" => "Mike"}
+    end
+  end
+
+  preludetest "update variable map with variable keys" do
+    def test() do
+      map = :erlang.hd([%{"foo" => "bar"}])
+      key = :erlang.hd(["foo"])
+      %{map | key => "baz"}
+    end
+  end
 end
