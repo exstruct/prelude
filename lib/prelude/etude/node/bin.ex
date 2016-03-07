@@ -24,13 +24,14 @@ defmodule Prelude.Etude.Node.Bin do
     vars = cons(vars)
     bin = {:bin, line, children}
 
-    erl(~S"""
+    ~S"""
     #{'__struct__' => 'Elixir.Prelude.Etude.Node.Bin.Thunk',
       arguments => unquote(values),
       construct => fun(unquote(vars)) ->
         unquote(bin)
       end}
-    """, line)
+    """
+    |> erl(line)
     |> wrap()
   end
 end

@@ -55,4 +55,14 @@ defmodule Prelude.Test.CaseExpr do
       end
     end
   end
+
+  preludetest "lazy case" do
+    def test do
+      value = :erlang.hd([1])
+      case :erlang.hd([{{{{{value}}}}}]) do
+        {{{{{v}}}}} when is_integer(v) ->
+          v
+      end
+    end
+  end
 end

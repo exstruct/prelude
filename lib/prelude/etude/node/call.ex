@@ -7,31 +7,36 @@ defmodule Prelude.Etude.Node.Call do
     module = unwrap(module)
     function = unwrap(function)
     args = unwrap(args)
-    case acc do
+
+    node = case acc do
       [] ->
         {fun, state} = State.put_call(state, elem(module, 2), elem(function, 2), args)
-        {wrap(put_arguments(fun, args)), state}
+        wrap(put_arguments(fun, args))
       _ ->
         arguments = cons(args)
 
-        ast = erl(~S"""
+        ~S"""
         #{'__struct__' => 'Elixir.Prelude.Etude.Node.Call.Thunk',
           dispatch => unquote(etude_dispatch),
           arguments => unquote(arguments),
           module => unquote(module),
           function => unquote(function)}
-        """, line)
+        """
+        |> erl(line)
         |> wrap()
-        {ast, state}
     end
+
+    {node, state}
   end
   def exit({:call, _line, fun, args}, state) do
     ## TODO
-    case fun do
+    node = case fun do
       {:atom, _, fun} ->
         {fun, state} = State.put_local_call(state, fun, args)
-        {wrap(put_arguments(fun, args)), state}
+        wrap(put_arguments(fun, args))
     end
+
+    {node, state}
   end
 end
 

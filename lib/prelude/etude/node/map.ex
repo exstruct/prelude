@@ -30,13 +30,14 @@ defmodule Prelude.Etude.Node.Map do
     values = cons(values)
     vars = cons(vars)
 
-    erl(~S"""
+    ~S"""
     #{'__struct__' => 'Elixir.Prelude.Etude.Node.Map.Thunk',
       arguments => unquote(values),
       construct => fun(unquote(vars)) ->
         unquote(map)
       end}
-    """, line)
+    """
+    |> erl(line)
     |> wrap()
   end
 
@@ -51,14 +52,15 @@ defmodule Prelude.Etude.Node.Map do
     map_var = var_for_node(map)
     update = {:map, line, map_var, children}
 
-    erl(~S"""
+    ~S"""
     #{'__struct__' => 'Elixir.Prelude.Etude.Node.MapUpdate.Thunk',
       map => unquote(map),
       arguments => unquote(values),
       construct => fun(unquote(map_var), unquote(vars)) ->
         unquote(update)
       end}
-    """, line)
+    """
+    |> erl(line)
     |> wrap()
   end
 end

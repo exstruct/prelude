@@ -28,24 +28,28 @@ defmodule Prelude.Etude.Node.Function do
 
   defp compile_etude_clause(name, arity, clauses, state) do
     calls = compile_calls(state) ++ compile_local_calls(state)
-    {:clause, -1, [{:atom, -1, name}, {:integer, -1, arity}, etude_dispatch], [],
+    {:clause, -1, [escape(name), escape(arity), etude_dispatch], [],
       calls ++ [compile_etude_thunk(clauses, state)]}
   end
 
   defp compile_etude_thunk(clauses, %{function: {function, arity}}) do
-    fun = {:named_fun, -1, :"_#{function}/#{arity}", clauses}
-    {:map, -1,
-      [{:map_field_assoc, -1, {:atom, -1, :__struct__}, {:atom, -1, __MODULE__.Thunk}},
-       {:map_field_assoc, -1, {:atom, -1, :arguments}, {:nil, -1}},
-       {:map_field_assoc, -1, {:atom, -1, :function}, fun}]}
+    function = {:named_fun, -1, :"_#{function}/#{arity}", clauses}
+    thunk = escape(__MODULE__.Thunk)
+    ~S"""
+    #{'__struct__' => unquote(thunk),
+      arguments => [],
+      function => unquote(function)}
+    """
+    |> erl(-1)
   end
 
   defp compile_public_etude_call(name, arity) do
-    {:call, -1, {:atom, -1, :__etude__},
-     [{:atom, -1, name}, {:integer, -1, arity},
-      {:call, -1,
-       {:remote, -1, {:atom, -1, Etude.Dispatch}, {:atom, -1, :from_process}},
-       []}]}
+    name = escape(name)
+    arity = escape(arity)
+    ~S"""
+    '__etude__'(unquote(name), unquote(arity), 'Elixir.Etude.Dispatch':from_process())
+    """
+    |> erl(-1)
   end
 
   defp compile_calls(%{calls: calls}) do
@@ -56,21 +60,28 @@ defmodule Prelude.Etude.Node.Function do
 
   defp compile_local_calls(%{local_calls: calls}) do
     Enum.map(calls, fn({{function, arity}, fn_alias}) ->
-      {:match, -1, fn_alias,
-        {:call, -1, {:atom, -1, :__etude_local__}, [
-          {:atom, -1, function},
-          {:integer, -1, arity},
-          etude_dispatch
-      ]}}
+      function = escape(function)
+      arity = escape(arity)
+      ~S"""
+      unquote(fn_alias) =
+        '__etude_local__'(unquote(function), unquote(arity), unquote(etude_dispatch))
+      """
+      |> erl(-1)
     end)
   end
 
   defp compile_dispatch_lookup(module, function, arity) do
-    {:call, -1, {:remote, -1, etude_dispatch, {:atom, -1, :resolve}}, [
-      {:atom, -1, module},
-      {:atom, -1, function},
-      {:integer, -1, arity}
-    ]}
+    module = escape(module)
+    function = escape(function)
+    arity = escape(arity)
+    ~S"""
+    apply(unquote(etude_dispatch), resolve, [
+      unquote(module),
+      unquote(function),
+      unquote(arity)
+    ])
+    """
+    |> erl(-1)
   end
 
   defp args(0) do

@@ -23,4 +23,17 @@ defmodule Prelude.Test.Function do
       "Robert"
     end
   end
+
+  preludetest "recursion" do
+    def test() do
+      local(5)
+    end
+
+    defp local(0) do
+      []
+    end
+    defp local(n) do
+      [{:foo, n} | local(n - 1)]
+    end
+  end
 end

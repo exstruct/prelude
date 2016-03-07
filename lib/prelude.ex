@@ -17,7 +17,7 @@ defmodule Prelude do
         other
     end)}
     |> Prelude.Compiler.eval_forms(env, scope)
-    |> compile_forms(opts)
+    |> compile_forms([:nowarn_shadow_vars | opts])
   end
 
   def compile_forms(forms, opts \\ []) do

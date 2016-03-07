@@ -71,8 +71,11 @@ defmodule Prelude.Etude do
   defp handle_etudes(_, []) do
     []
   end
-  defp handle_etudes(name, etudes) do
+  defp handle_etudes(:__etude__ = name, etudes) do
     [{:function, -1, name, 3, Enum.reverse([etude_default_clause | etudes])}]
+  end
+  defp handle_etudes(:__etude_local__ = name, etudes) do
+    [{:function, -1, name, 3, Enum.reverse(etudes)}]
   end
 
   defp etude_default_clause do

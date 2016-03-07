@@ -8,14 +8,15 @@ defmodule Prelude.Etude.Node.Op do
     node = if ready?(lhs_w, state) && ready?(rhs_w, state) do
       {:op, line, name, lhs, rhs}
     else
-      op = {:atom, line, name}
+      op = escape(name, line)
       arguments = cons([lhs, rhs])
 
-      erl(~S"""
+      ~S"""
       #{'__struct__' => 'Elixir.Prelude.Etude.Node.Op.Thunk',
         arguments => unquote(arguments),
         op => unquote(op)}
-      """, line)
+      """
+      |> erl(line)
       |> wrap()
     end
 

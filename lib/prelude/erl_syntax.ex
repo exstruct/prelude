@@ -34,6 +34,23 @@ defmodule Prelude.ErlSyntax do
     :erl_parse.parse_exprs(tokens ++ [dot: -1])
   end
 
+  def escape(value, line \\ -1)
+  def escape(value, line) when is_atom(value) do
+    {:atom, line, value}
+  end
+  def escape(value, line) when is_integer(value) do
+    {:integer, line, value}
+  end
+  def escape(value, line) when is_binary(value) do
+    {:bin, line, {:bin_element, line, {:string, to_char_list(value)}, :default, :default}}
+  end
+  def escape([], line) do
+    {:nil, line}
+  end
+  def escape([argument | arguments], line) do
+    {:cons, line, argument, escape(arguments, line)}
+  end
+
   defp apply_unquote(tree, line) do
     tree
     |> Macro.escape()
