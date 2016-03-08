@@ -1,5 +1,5 @@
 defmodule Prelude.Etude do
-  @blacklisted_functions [:__struct__, :__info__]
+  @blacklisted_functions [__struct__: 0, __info__: 1]
 
   def compile(forms, _opts) do
     {attributes, exports, functions} = Enum.reduce(forms, {[], %{}, %{}}, &partition/2)
@@ -32,8 +32,8 @@ defmodule Prelude.Etude do
     {[other | attributes], exports, funs}
   end
 
-  defp handle_function({{name, 0}, clauses}, _state, {functions, public_etudes, private_etudes}) when name in @blacklisted_functions do
-    function = {:function, -1, name, 0, clauses}
+  defp handle_function({{name, arity}, clauses}, _state, {functions, public_etudes, private_etudes}) when {name, arity} in @blacklisted_functions do
+    function = {:function, -1, name, arity, clauses}
     {functions ++ [function],
      public_etudes,
      private_etudes}

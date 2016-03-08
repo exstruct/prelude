@@ -89,7 +89,7 @@ defmodule Prelude.Etude.Node.Function do
   end
   defp args(arity) do
     {a, c} = args(arity - 1)
-    var = {:var, -1, :"arg_#{arity}"}
+    var = escape(:"arg_#{arity}")
     {[var | a], {:cons, -1, var, c}}
   end
 end

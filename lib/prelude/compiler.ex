@@ -9,16 +9,23 @@ defmodule Prelude.Compiler do
     |> compile(opts)
   end
 
-  defp pp(forms) do
-    :parse_trans_pp.pp_src(forms, '.test/#{module_name(forms)}.erl.out')
-    forms
-  end
+  if Mix.env == :test do
+    defp pp(forms) do
+      :parse_trans_pp.pp_src(forms, '.test/#{module_name(forms)}.erl.out')
+      forms
+    end
 
-  defp module_name([{:attribute, _, :module, name} | _]) do
-    name
-  end
-  defp module_name([_ | rest]) do
-    module_name(rest)
+    defp module_name([{:attribute, _, :module, name} | _]) do
+      name
+    end
+    defp module_name([_ | rest]) do
+      module_name(rest)
+    end
+  else
+    @compile {:inline, [{:pp, 1}]}
+    defp pp(forms) do
+      forms
+    end
   end
 
   defp compile(forms, opts) do
@@ -39,7 +46,7 @@ defmodule Prelude.Compiler do
        :report_warnings | opts]
     end
 
-    case :compile.forms(forms, opts) do
+    case :compile.noenv_forms(forms, opts) do
       {:ok, module, beam, _} ->
         {:ok, module, beam}
       other ->

@@ -12,7 +12,7 @@ defmodule Prelude.Etude.Node.Case do
 
       ~S"""
       #{'__struct__' => 'Elixir.Prelude.Etude.Node.Case.Thunk',
-        value => unquote(value),
+        expression => unquote(value),
         match => unquote(match)}
       """
       |> erl(line)
@@ -29,18 +29,18 @@ defmodule Prelude.Etude.Node.Case.Thunk do
 end
 
 defimpl Etude.Thunk, for: Prelude.Etude.Node.Case.Thunk do
-  def resolve(%{value: value, match: match}, state) do
+  def resolve(%{expression: expression, match: match}, state) do
     ## TODO make this not as eager... maybe it's not possible without
     ##      reimplementing the BEAM pattern matching
-    case Etude.Serializer.TERM.__serialize__(value, state, []) do
-      {value, state} ->
-        {match.(value), state}
-      {:await, value, state} ->
+    case Etude.Serializer.TERM.__serialize__(expression, state, []) do
+      {expression, state} ->
+        {match.(expression), state}
+      {:await, expression, state} ->
         {:await, %{__struct__: Etude.Thunk.Continuation,
-                   function: fn([v], state) ->
-                     resolve(%{value: v, match: match}, state)
+                   function: fn([expression], state) ->
+                     resolve(%{expression: expression, match: match}, state)
                    end,
-                   arguments: [value]}, state}
+                   arguments: [expression]}, state}
     end
   end
 end
