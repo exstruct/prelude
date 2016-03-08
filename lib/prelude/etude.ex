@@ -1,4 +1,6 @@
 defmodule Prelude.Etude do
+  @blacklisted_functions [:__struct__, :__info__]
+
   def compile(forms, _opts) do
     {attributes, exports, functions} = Enum.reduce(forms, {[], %{}, %{}}, &partition/2)
 
@@ -19,7 +21,7 @@ defmodule Prelude.Etude do
   end
   defp partition({:attribute, _, :export, exported} = attr, {attributes, exports, funs}) do
     exports = Enum.reduce(exported, exports, fn
-      ({:__struct__, 0}, acc) ->
+      ({name, 0}, acc) when name in @blacklisted_functions ->
         acc
       ({name, arity}, acc) ->
         Map.put(acc, {name, arity}, true)
@@ -30,8 +32,8 @@ defmodule Prelude.Etude do
     {[other | attributes], exports, funs}
   end
 
-  defp handle_function({{:__struct__, 0}, clauses}, _state, {functions, public_etudes, private_etudes}) do
-    function = {:function, -1, :__struct__, 0, clauses}
+  defp handle_function({{name, 0}, clauses}, _state, {functions, public_etudes, private_etudes}) when name in @blacklisted_functions do
+    function = {:function, -1, name, 0, clauses}
     {functions ++ [function],
      public_etudes,
      private_etudes}

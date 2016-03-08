@@ -12,9 +12,9 @@ defmodule Prelude.Test.Case do
     actual = Module.concat(base, "Actual")
     expected = Module.concat(base, "Expected")
     quote do
-      test unquote(name) do
-        defmodule unquote(expected), unquote([body])
+      unquote({:defmodule, [], [expected, [body]]})
 
+      test unquote(name) do
         {:ok, mod, bin} = defetude unquote(actual), unquote([body])
         :code.load_binary(mod, __ENV__.file |> to_char_list(), bin)
 

@@ -1,11 +1,8 @@
 defmodule Prelude.Compiler do
-  def compile_elixir(module, block, vars, env) do
-    :prelude_elixir_module.compile(module, block, vars, env)
-  end
-
-  def compile_erlang(forms, opts) do
+  def compile_forms(forms, opts) do
     ## TODO pull backend from module attribute
     backend = Prelude.Etude
+
     forms
     |> backend.compile(opts)
     |> pp()
@@ -34,27 +31,19 @@ defmodule Prelude.Compiler do
   end
 
   defp to_beam(forms, opts) do
-    opts = [
-      :binary,
-      :report_errors,
-      :report_warnings
-    ] ++ opts
-
-    :compile.forms(forms, opts)
-  end
-
-  def eval_forms(erl, env, scope) do
-    parsed_binding = case :elixir_scope.load_binding([], scope) do
-      {binding, _, _} ->
-        binding
-      {binding, _} ->
-        binding
+    opts = if opts[:from_elixir] do
+      [:binary | opts]
+    else
+      [:binary,
+       :report_errors,
+       :report_warnings | opts]
     end
-    {:value, value, _} = erl_eval(erl, parsed_binding, env)
-    value
-  end
 
-  defp erl_eval(erl, parsed_binding, _) do
-    :erl_eval.expr(erl, parsed_binding, :none, :none, :none)
+    case :compile.forms(forms, opts) do
+      {:ok, module, beam, _} ->
+        {:ok, module, beam}
+      other ->
+        other
+    end
   end
 end

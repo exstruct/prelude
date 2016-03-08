@@ -75,7 +75,7 @@ defmodule Prelude.Etude.Node.Function do
     function = escape(function)
     arity = escape(arity)
     ~S"""
-    apply(unquote(etude_dispatch), resolve, [
+    erlang:apply(unquote(etude_dispatch), resolve, [
       unquote(module),
       unquote(function),
       unquote(arity)
