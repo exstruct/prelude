@@ -1,6 +1,7 @@
 defmodule Prelude.Test.Compiler do
   use Prelude.Test.Case
 
+  @tag :pending
   preludetest "users" do
     def test() do
       __MODULE__.read(%{}, 2)
