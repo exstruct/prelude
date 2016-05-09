@@ -1,7 +1,7 @@
 defmodule Prelude.Compiler do
   def compile_forms(forms, opts) do
     ## TODO pull backend from module attribute
-    backend = Prelude.Etude
+    backend = opts[:backend] || Prelude.Etude
 
     forms
     |> backend.compile(opts)
@@ -39,7 +39,8 @@ defmodule Prelude.Compiler do
 
   defp to_beam(forms, opts) do
     opts = if opts[:from_elixir] do
-      [:binary | opts]
+      [:binary,
+       :report_errors | opts]
     else
       [:binary,
        :report_errors,

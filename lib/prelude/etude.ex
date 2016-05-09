@@ -1,44 +1,69 @@
 defmodule Prelude.Etude do
-  @blacklisted_functions [__struct__: 0, __info__: 1]
+  alias Prelude.ErlSyntax
+  require Prelude.ErlSyntax
+
+  @blacklisted_functions [__struct__: 0, __info__: 1, __etude__: 3, __after_compile__: 2]
+
+  defmacro __using__(_) do
+    quote do
+      @before_compile Prelude.Etude
+    end
+  end
+
+  defmacro __before_compile__(env) do
+    module = rename_module(env.module)
+    quote line: -1 do
+      def __etude__(name, arity, dispatch) do
+        unquote(module).__etude__(name, arity, dispatch)
+      end
+    end
+  end
 
   def compile(forms, _opts) do
-    {attributes, exports, functions} = Enum.reduce(forms, {[], %{}, %{}}, &partition/2)
+    {module, attributes, exports, functions} = Enum.reduce(forms, {nil, [], %{}, %{}}, &partition/2)
 
     initial_state = %Prelude.Etude.State{
       locals: Enum.reduce(functions, %{}, fn({key, _}, acc) -> Map.put(acc, key, true) end),
       exports: exports,
+      module: module
     }
 
     functions
-    |> Enum.reduce({[], [], []}, &handle_function(&1, initial_state, &2))
-    |> concat(attributes)
+    |> Enum.reduce({[], []}, &handle_function(&1, initial_state, &2))
+    |> concat(attributes, module)
   end
 
-  defp partition({:function, _, name, arity, clauses}, {attributes, exports, funs}) do
+  defp partition({:function, _, name, arity, clauses}, {module, attributes, exports, funs}) do
     key = {name, arity}
     prev = Map.get(funs, key, [])
-    {attributes, exports, Map.put(funs, key, prev ++ clauses)}
+    {module, attributes, exports, Map.put(funs, key, prev ++ clauses)}
   end
-  defp partition({:attribute, _, :export, exported} = attr, {attributes, exports, funs}) do
+  defp partition({:attribute, _, :export, exported}, {module, attributes, exports, funs}) do
     exports = Enum.reduce(exported, exports, fn
       ({name, 0}, acc) when name in @blacklisted_functions ->
         acc
       ({name, arity}, acc) ->
         Map.put(acc, {name, arity}, true)
     end)
-    {[attr | attributes], exports, funs}
+    {module, attributes, exports, funs}
   end
-  defp partition(other, {attributes, exports, funs}) do
-    {[other | attributes], exports, funs}
+  defp partition({:attribute, _, :spec, _}, state) do
+    state
+  end
+  defp partition({:attribute, line, :module, module}, {_, attributes, exports, funs}) do
+    module = rename_module(module)
+    attr = {:attribute, line, :module, module}
+    {module, [attr | attributes], exports, funs}
+  end
+  defp partition(other, {module, attributes, exports, funs}) do
+    {module, [other | attributes], exports, funs}
   end
 
-  defp handle_function({{name, arity}, clauses}, _state, {functions, public_etudes, private_etudes}) when {name, arity} in @blacklisted_functions do
-    function = {:function, -1, name, arity, clauses}
-    {functions ++ [function],
-     public_etudes,
+  defp handle_function({{name, arity}, _}, _state, {public_etudes, private_etudes}) when {name, arity} in @blacklisted_functions do
+    {public_etudes,
      private_etudes}
   end
-  defp handle_function({{name, arity}, clauses}, state, {functions, public_etudes, private_etudes}) do
+  defp handle_function({{name, arity}, clauses}, state, {public_etudes, private_etudes}) do
     state = %{state | function: {name, arity},
                        public?: Map.has_key?(state.exports, {name, arity})}
 
@@ -46,23 +71,20 @@ defmodule Prelude.Etude do
     exit = Prelude.Etude.Node.traverse_fn(:exit)
     node = {:function, -1, name, arity, clauses}
 
-    {additional_functions, {additional_public, additional_private}} = Prelude.ErlSyntax.traverse(node, state, enter, exit)
+    {additional_public, additional_private} = Prelude.ErlSyntax.traverse(node, state, enter, exit)
 
-    {functions ++ additional_functions,
-     public_etudes ++ additional_public,
+    {public_etudes ++ additional_public,
      private_etudes ++ additional_private}
   end
 
-  defp concat({functions, [], private_etudes}, attributes) do
+  defp concat({[], private_etudes}, attributes, module) do
     Enum.reverse(attributes)
-    ++ functions
-    ++ handle_etudes(:__etude_local__, private_etudes)
+    ++ handle_etudes(:__etude_local__, private_etudes, module)
   end
-  defp concat({functions, public_etudes, private_etudes}, attributes) do
+  defp concat({public_etudes, private_etudes}, attributes, module) do
     export_etudes(attributes)
-    ++ functions
-    ++ handle_etudes(:__etude__, public_etudes)
-    ++ handle_etudes(:__etude_local__, private_etudes)
+    ++ handle_etudes(:__etude__, public_etudes, module)
+    ++ handle_etudes(:__etude_local__, private_etudes, module)
   end
 
   defp export_etudes(attributes) do
@@ -70,17 +92,27 @@ defmodule Prelude.Etude do
     |> Enum.reverse()
   end
 
-  defp handle_etudes(_, []) do
+  defp handle_etudes(_, [], _) do
     []
   end
-  defp handle_etudes(:__etude__ = name, etudes) do
-    [{:function, -1, name, 3, Enum.reverse([etude_default_clause | etudes])}]
+  defp handle_etudes(:__etude__ = name, etudes, module) do
+    [{:function, -1, name, 3, Enum.reverse([etude_default_clause(module) | etudes])}]
   end
-  defp handle_etudes(:__etude_local__ = name, etudes) do
+  defp handle_etudes(:__etude_local__ = name, etudes, _) do
     [{:function, -1, name, 3, Enum.reverse(etudes)}]
   end
 
-  defp etude_default_clause do
-    {:clause, -1, [{:var, -1, :_}, {:var, -1, :_}, {:var, -1, :_}], [], [{:atom, -1, nil}]}
+  defp etude_default_clause(module) do
+    module = ErlSyntax.escape(module)
+    body = ~S"""
+    erlang:error('Elixir.UndefinedFunctionError':exception([{arity, Arity}, {function, Function}, {module, unquote(module)}]))
+    """
+    |> ErlSyntax.erl()
+    {:clause, -1, [{:var, -1, :Function}, {:var, -1, :Arity}, {:var, -1, :_}], [], [body]}
+  end
+
+  defp rename_module(module) do
+    parts = Module.split(module)
+    Enum.join(["Etude" | parts], ".") |> String.to_atom()
   end
 end

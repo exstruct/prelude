@@ -5,7 +5,8 @@ defmodule Prelude.Etude.State do
             calls: %{},
             local_calls: %{},
             function: nil,
-            public?: false
+            public?: false,
+            module: nil
 
   require Prelude.ErlSyntax
   alias Prelude.ErlSyntax

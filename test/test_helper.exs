@@ -7,21 +7,20 @@ defmodule Prelude.Test.Case do
     end
   end
 
-  defmacro preludetest(name, [body | assertions]) do
+  defmacro preludetest(name, [{:do, body} | assertions]) do
     base = Module.concat(__CALLER__.module, name |> String.replace(" ", "_") |> Mix.Utils.camelize())
     actual = Module.concat(base, "Actual")
     expected = Module.concat(base, "Expected")
     quote do
-      unquote({:defmodule, [], [expected, [body]]})
+      unquote({:defmodule, [], [expected, [do: body]]})
+
+      unquote({:defmodule, [], [actual, [do: [{:use, [], [Prelude]}, body]]]})
 
       test unquote(name) do
-        {:ok, mod, bin} = defetude unquote(actual), unquote([body])
-        :code.load_binary(mod, __ENV__.file |> to_char_list(), bin)
-
         dispatch = Etude.Dispatch.Fallback
         state = %Etude.State{mailbox: self()}
 
-        {var!(value), _} = mod.__etude__(:test, 0, dispatch)
+        {var!(value), _} = unquote(actual).__etude__(:test, 0, dispatch)
         |> Etude.resolve(state)
 
         assert var!(value) == unquote(expected).test()

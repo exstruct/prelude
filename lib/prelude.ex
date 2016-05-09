@@ -1,6 +1,24 @@
 defmodule Prelude do
   @vsn Mix.Project.config[:version]
-  @elixir_docs 'ExDc'
+
+  defmacro __using__(opts) do
+    backend = opts[:backend] || Prelude.Etude
+    quote do
+      use unquote(backend)
+      @after_compile __MODULE__
+
+      def __after_compile__(env, beam) do
+        module = {:module, __MODULE__, beam, []}
+        opts = unquote([{:from_elixir, true} | opts])
+        case Prelude.compile_beam(module, opts) do
+          {:ok, name, beam} ->
+            Mix.Project.compile_path()
+            |> Path.join("#{name}.beam")
+            |> File.write!(beam)
+        end
+      end
+    end
+  end
 
   def compile_string(str, opts \\ []) do
     str
@@ -15,29 +33,18 @@ defmodule Prelude do
     |> compile_forms([{:from_elixir, true} | opts])
   end
 
-  def compile_forms(forms, opts \\ [])
-  def compile_forms({forms, docs}, opts) when is_binary(docs) do
-    case compile_forms(forms, opts) do
-      {:ok, module, beam} ->
-        beam = :elixir_module.add_beam_chunk(beam, @elixir_docs, docs)
-        {:ok, module, beam}
-      other ->
-        other
-    end
-  end
-  def compile_forms(forms, opts) do
+  def compile_forms(forms, opts \\ []) do
     Prelude.Compiler.compile_forms(forms, opts)
   end
 
-  def parse_transform(forms, _options) do
-    compile_forms(forms, [out: :forms])
+  def compile_beam(beam, opts \\ []) do
+    beam
+    |> decompile_beam()
+    |> compile_forms(opts)
   end
 
-  defmacro defetude(name, block) do
-    quote bind_quoted: [name: Macro.escape(name),
-                        block: Macro.escape(block)] do
-      Prelude.compile_quoted({:defmodule, [import: Kernel], [name, block]}, [file: __ENV__.file, line: __ENV__.line])
-    end
+  def parse_transform(forms, _options) do
+    compile_forms(forms, [out: :forms, single_module: true])
   end
 
   defp eval_quoted(quoted, opts) do
@@ -52,9 +59,9 @@ defmodule Prelude do
     decompile_beam(result)
   end
   defp decompile_beam({:module, module, beam, _}) do
-    case :beam_lib.chunks(beam, [:abstract_code, @elixir_docs]) do
-      {:ok, {^module, [{:abstract_code, {:raw_abstract_v1, forms}}, {@elixir_docs, docs}]}} ->
-        {forms, docs}
+    case :beam_lib.chunks(beam, [:abstract_code]) do
+      {:ok, {^module, [{:abstract_code, {:raw_abstract_v1, forms}}]}} ->
+        forms
       {:ok, {:no_debug_info, _}} ->
         throw({:forms_not_found, module})
       {:error, :beam_lib, {:file_error, _, :enoent}} ->
