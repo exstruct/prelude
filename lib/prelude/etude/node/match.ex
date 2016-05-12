@@ -4,16 +4,16 @@ defmodule Prelude.Etude.Node.Match do
   def exit({:match, line, lhs, rhs_w}, state) do
     rhs = unwrap(rhs_w)
     if ready?(rhs_w, state) do
-      {{:match, line, lhs, rhs}, state}
+      {optimize(line, lhs, rhs), state}
     else
       case lhs do
         {:var, _, _} ->
-          {{:match, line, lhs, rhs}, state}
+          {optimize(line, lhs, rhs), state}
         _ ->
           case postwalk(lhs, state) do
             {_, []} ->
               ## TODO handle case when there are no variables
-              {{:match, line, lhs, rhs}, state}
+              {optimize(line, lhs, rhs), state}
             {lhs, vars} ->
               vars = Enum.reverse(vars)
               assign = {:tuple, line, Enum.map(vars, fn({var, _}) -> var end)}
@@ -46,6 +46,13 @@ defmodule Prelude.Etude.Node.Match do
           end
       end
     end
+  end
+
+  defp optimize(line, node, node) do
+    {:atom, line, nil}
+  end
+  defp optimize(line, lhs, rhs) do
+    {:match, line, lhs, rhs}
   end
 
   defp postwalk(lhs, _state) do
@@ -82,16 +89,9 @@ defimpl Etude.Thunk, for: Prelude.Etude.Node.Match.Thunk do
   def resolve(%{expression: expression, match: match}, state) do
     ## TODO make this not as eager... maybe it's not possible without
     ##      reimplementing the BEAM pattern matching
-    case Etude.Serializer.TERM.__serialize__(expression, state, []) do
-      {expression, state} ->
-        {match.(expression), state}
-      {:await, expression, state} ->
-        {:await, %{__struct__: Etude.Thunk.Continuation,
-                   function: fn([expression], state) ->
-                     resolve(%{expression: expression, match: match}, state)
-                   end,
-                   arguments: [expression]}, state}
-    end
+    Etude.Thunk.resolve_recursive(expression, state, fn(expression, state) ->
+      {match.(expression), state}
+    end)
   end
 end
 

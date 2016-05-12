@@ -32,15 +32,8 @@ defimpl Etude.Thunk, for: Prelude.Etude.Node.Case.Thunk do
   def resolve(%{expression: expression, match: match}, state) do
     ## TODO make this not as eager... maybe it's not possible without
     ##      reimplementing the BEAM pattern matching
-    case Etude.Serializer.TERM.__serialize__(expression, state, []) do
-      {expression, state} ->
-        {match.(expression), state}
-      {:await, expression, state} ->
-        {:await, %{__struct__: Etude.Thunk.Continuation,
-                   function: fn([expression], state) ->
-                     resolve(%{expression: expression, match: match}, state)
-                   end,
-                   arguments: [expression]}, state}
-    end
+    Etude.Thunk.resolve_recursive(expression, state, fn(expression, state) ->
+      {match.(expression), state}
+    end)
   end
 end

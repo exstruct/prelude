@@ -17,7 +17,7 @@ defmodule Prelude.Etude.Node.Function do
   end
 
   defp compile_etude_thunk(clauses, %{function: {function, arity}}) do
-    function = {:named_fun, -1, :"_#{function}/#{arity}", clauses}
+    function = {:named_fun, -1, :"_@@@#{function}___#{arity}", clauses}
     thunk = escape(__MODULE__.Thunk)
     ~S"""
     #{'__struct__' => unquote(thunk),
@@ -33,15 +33,20 @@ defmodule Prelude.Etude.Node.Function do
     end)
   end
 
-  defp compile_local_calls(%{local_calls: calls}) do
+  defp compile_local_calls(%{exports: exports, local_calls: calls}) do
     Enum.map(calls, fn({{function, arity}, fn_alias}) ->
-      function = escape(function)
-      arity = escape(arity)
-      ~S"""
-      unquote(fn_alias) =
-        '__etude_local__'(unquote(function), unquote(arity), unquote(etude_dispatch))
-      """
-      |> erl(-1)
+      resolve = if Map.has_key?(exports, {function, arity}) do
+        :__etude__
+      else
+        :__etude_local__
+      end |> escape()
+
+      {:match, -1, fn_alias,
+       {:call, -1, resolve, [
+           escape(function),
+           escape(arity),
+           etude_dispatch
+         ]}}
     end)
   end
 

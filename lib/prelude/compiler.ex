@@ -11,7 +11,7 @@ defmodule Prelude.Compiler do
 
   if Mix.env == :test do
     defp pp(forms) do
-      :parse_trans_pp.pp_src(forms, '.test/#{module_name(forms)}.erl.out')
+      :parse_trans_pp.pp_src(forms, '.test/#{module_name(forms)}.out.erl')
       forms
     end
 

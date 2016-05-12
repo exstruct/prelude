@@ -24,12 +24,13 @@ defmodule Prelude.Mixfile do
   end
 
   defp deps do
-    [{:etude, "1.0.0-beta.0"},
+    [{:etude, "~> 1.0.0-beta.1"},
      {:excheck, "~> 0.3.0", only: [:dev, :test, :bench]},
      {:triq, github: "krestenkrab/triq", only: [:dev, :test, :bench]},
      {:benchfella, "~> 0.2.0", only: [:dev, :test, :bench]},
      {:parse_trans, "~> 2.9.0", only: [:dev, :test, :bench]},
-     {:mix_test_watch, "~> 0.2", only: :dev}]
+     {:mix_test_watch, "~> 0.2", only: :dev},
+     {:mazurka, "~> 1.0.0", only: [:test]}]
   end
 
   defp package do
