@@ -12,14 +12,10 @@ defmodule Prelude do
         opts = unquote([{:from_elixir, true} | opts])
         case Prelude.compile_beam(module, opts) do
           {:ok, name, beam} ->
-            case :code.which(__MODULE__) do
-              :in_memory ->
-                :code.load_binary(name, to_char_list(__ENV__.file), beam)
-              _ ->
-                Mix.Project.compile_path()
-                |> Path.join("#{name}.beam")
-                |> File.write!(beam)
-            end
+            ## TODO how do we know if it's being compiled to the filesystem or in memory?
+            Mix.Project.compile_path()
+            |> Path.join("#{name}.beam")
+            |> File.write!(beam)
         end
       end
     end

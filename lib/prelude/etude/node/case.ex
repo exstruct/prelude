@@ -4,20 +4,16 @@ defmodule Prelude.Etude.Node.Case do
   def exit({:case, line, value_w, clauses}, state) do
     value = unwrap(value_w)
 
-    node = if ready?(value_w, state) do
-      {:case, line, value, clauses}
-    else
-      ## TODO evaluate any variables in the clauses
-      match = {:fun, line, {:clauses, clauses}}
+    ## TODO evaluate any variables in the clauses
+    match = {:fun, line, {:clauses, clauses}}
 
-      ~S"""
-      #{'__struct__' => 'Elixir.Prelude.Etude.Node.Case.Thunk',
-        expression => unquote(value),
-        match => unquote(match)}
-      """
-      |> erl(line)
-      |> wrap()
-    end
+    node = ~S"""
+    #{'__struct__' => 'Elixir.Prelude.Etude.Node.Case.Thunk',
+      expression => unquote(value),
+      match => unquote(match)}
+    """
+    |> erl(line)
+    |> wrap()
 
     {node, state}
   end

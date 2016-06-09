@@ -24,7 +24,7 @@ defmodule Prelude.Mixfile do
   end
 
   defp deps do
-    [{:etude, "~> 1.0.0-beta.1"},
+    [{:etude, "~> 1.0.0-beta.2"},
      {:excheck, "~> 0.3.0", only: [:dev, :test, :bench]},
      {:triq, github: "krestenkrab/triq", only: [:dev, :test, :bench]},
      {:benchfella, "~> 0.2.0", only: [:dev, :test, :bench]},
