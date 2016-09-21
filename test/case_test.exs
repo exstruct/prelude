@@ -6,7 +6,8 @@ defmodule Prelude.Test.CaseExpr do
       value = true
       case value do
         true ->
-          "Hello"
+          greeting = "Hello"
+          greeting
         _ ->
           "Goodbye"
       end

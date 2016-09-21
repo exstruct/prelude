@@ -1,4 +1,7 @@
 defmodule Prelude.Etude.Node do
+  import Prelude.ErlSyntax
+  alias Prelude.Etude.State
+
   defmacro __using__(_) do
     quote do
       import Prelude.ErlSyntax
@@ -98,7 +101,7 @@ defmodule Prelude.Etude.Node do
     node
   end
 
-  def ready?({:__ETUDE_THUNK__, _, _}, _state) do
+  def ready?(node, _state) when is_tuple(node) and elem(node, 0) in [:block, :call, :case, :cond, :if, :op, :var] do
     false
   end
   def ready?(value, _state) when is_atom(value) do
@@ -117,5 +120,65 @@ defmodule Prelude.Etude.Node do
 
   def etude_dispatch do
     {:var, -1, :__etude_dispatch__}
+  end
+
+
+
+
+
+
+
+  def wrap_value(value, state, deps, vars) do
+    if ready?(value, state) do
+      {value, state, deps, vars}
+    else
+      {var, state} = State.gensym(state)
+      {var, state, [to_term(value) | deps], [var | vars]}
+    end
+  end
+
+  def wrap_node(node, state, [], _) do
+    {node, state}
+  end
+  def wrap_node(node, state, [dep], [var]) do
+    node = ~S"""
+    'Elixir.Etude.Future':map(
+      unquote(dep),
+      fun(unquote(var)) ->
+        unquote(node)
+      end
+    )
+    """
+    |> erl(elem(node, 1))
+    {node, state}
+  end
+  def wrap_node(node, state, deps, vars) do
+    deps = cons(deps)
+    vars = cons(vars)
+    node = ~S"""
+    'Elixir.Etude.Future':map(
+      'Elixir.Etude.Future':parallel(unquote(deps)),
+      fun(unquote(vars)) ->
+        unquote(node)
+      end
+    )
+    """
+    |> erl(elem(node, 1))
+    {node, state}
+  end
+
+  defp to_term(future) do
+    ~S"""
+    'Elixir.Etude.Future':to_term(unquote(future))
+    """
+    |> erl(-1)
+  end
+
+  def make_binding({:var, line, name}) do
+    name = escape(name, line)
+    binding = erl(~S"""
+    #{'__struct__' => 'Elixir.Etude.Match.Binding',
+    name => unquote(name)}
+    """, line)
   end
 end

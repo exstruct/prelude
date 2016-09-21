@@ -13,18 +13,45 @@ defmodule Prelude.Etude.Node.Function do
   defp compile_etude_clause(name, arity, clauses, state) do
     calls = compile_calls(state) ++ compile_local_calls(state)
     {:clause, -1, [escape(name), escape(arity), etude_dispatch], [],
-      calls ++ [compile_etude_thunk(clauses, state)]}
+      calls ++ [compile_etude_future(clauses, state)]}
   end
 
-  defp compile_etude_thunk(clauses, %{function: {function, arity}}) do
+  defp compile_etude_future(clauses, %{function: {function, arity}} = state) do
+    clauses = compile_function_clauses(clauses, state)
     function = {:named_fun, -1, :"_@@@#{function}___#{arity}", clauses}
-    thunk = escape(__MODULE__.Thunk)
+
     ~S"""
-    #{'__struct__' => unquote(thunk),
-      arguments => [],
-      function => unquote(function)}
+    'Elixir.Etude.Future':'of'(unquote(function))
     """
     |> erl(-1)
+  end
+
+  defp compile_function_clauses(clauses, %{function: {_, 0}}) do
+    clauses
+  end
+  defp compile_function_clauses(clauses, %{function: {_, 1}} = state) do
+    {var, state} = State.gensym(state)
+    [
+      {:clause, -1, [var], [], [
+        {:case, -1, var, for {:clause, line, args, guards, body} <- clauses do
+          {:clause, line, args, guards, body}
+        end}
+        |> Prelude.Etude.Node.Case.exit(state)
+        |> elem(0)
+      ]}
+    ]
+  end
+  defp compile_function_clauses(clauses, %{function: {_, arity}} = state) do
+    {vars, state} = 1..arity |> Enum.map_reduce(state, fn(_, s) -> State.gensym(s) end)
+    [
+      {:clause, -1, vars, [], [
+        {:case, -1, {:tuple, -1, vars}, for {:clause, line, args, guards, body} <- clauses do
+          {:clause, line, [{:tuple, -1, args}], guards, body}
+        end}
+        |> Prelude.Etude.Node.Case.exit(state)
+        |> elem(0)
+     ]}
+    ]
   end
 
   defp compile_calls(%{calls: calls}) do
@@ -62,16 +89,5 @@ defmodule Prelude.Etude.Node.Function do
     ])
     """
     |> erl(-1)
-  end
-end
-
-defmodule Prelude.Etude.Node.Function.Thunk do
-  defstruct arguments: [],
-            function: nil
-end
-
-defimpl Etude.Thunk, for: Prelude.Etude.Node.Function.Thunk do
-  def resolve(%{function: function, arguments: arguments}, state) when is_function(function) do
-    {apply(function, arguments), state}
   end
 end

@@ -16,8 +16,19 @@ defmodule Prelude.Test.Case do
         dispatch = Etude.Dispatch.Fallback
         state = %Etude.State{mailbox: self()}
 
-        {var!(value), state} = unquote(module).__etude__(:test, 0, dispatch)
-        |> Etude.resolve(state)
+        res = unquote(module).__etude__(:test, 0, dispatch)
+        |> Etude.Future.ap([])
+        |> Etude.Traversable.traverse()
+        |> Etude.fork(state)
+
+        var!(value) = case res do
+                        {:ok, value, _} ->
+                          value
+                        {:error, %{stacktrace: stacktrace} = error, _} ->
+                          reraise error, stacktrace
+                        {:error, error, _} ->
+                          raise error
+                      end
 
         assert var!(value) == unquote(module).test()
 

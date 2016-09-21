@@ -6,7 +6,8 @@ defmodule Prelude.Etude.State do
             local_calls: %{},
             function: nil,
             public?: false,
-            module: nil
+    module: nil,
+    var_count: 0
 
   require Prelude.ErlSyntax
   alias Prelude.ErlSyntax
@@ -25,14 +26,7 @@ defmodule Prelude.Etude.State do
   end
   def put_local_call(%{function: {function, arity}} = state, function, arity) do
     fn_alias = {:var, -1, :"_@@@#{function}___#{arity}"}
-
-    call = ErlSyntax.erl(~S"""
-    #{'__struct__' => 'Elixir.Prelude.Etude.State.Thunk',
-      arguments => [],
-      function => unquote(fn_alias)}
-    """, -1)
-
-    {call, state}
+    {fn_alias, state}
   end
   def put_local_call(%{local_calls: calls} = state, function, arity) when is_integer(arity) do
     fn_alias = {:var, -1, :"_@@#{function}___#{arity}"}
@@ -43,17 +37,8 @@ defmodule Prelude.Etude.State do
     # TODO
     false
   end
-end
 
-defmodule Prelude.Etude.State.Thunk do
-  defstruct arguments: [],
-            function: nil
-end
-
-defimpl Etude.Thunk, for: Prelude.Etude.State.Thunk do
-  def resolve(%{function: function, arguments: arguments}, state) do
-    Etude.Thunk.resolve_all(arguments, state, fn(arguments, state) ->
-      {apply(function, arguments), state}
-    end)
+  def gensym(%{var_count: count} = state) do
+    {{:var, -1, :"_@etude_#{count}"}, %{state | var_count: count + 1}}
   end
 end
