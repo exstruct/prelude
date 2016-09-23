@@ -184,14 +184,7 @@ defmodule Prelude.Etude.Node do
 
   def compile_match(node) do
     {:value, expr, _} = :erl_eval.expr(node, [])
-    expr = escape(expr)
-
-    ~S"""
-    fun(_@etude_value, _@etude_binding) ->
-      'Elixir.Etude.Match.Executable':execute(unquote(expr), _@etude_value, _@etude_binding)
-    end
-    """
-    |> erl(-1)
+    escape(expr)
   catch
     _, error ->
       IO.inspect node

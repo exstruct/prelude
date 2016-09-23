@@ -1,8 +1,12 @@
 defmodule Prelude.Etude.Node.Clause do
   use Prelude.Etude.Node
 
-  def enter(node, state) do
+  def enter({:clause, _, patterns, _, _} = node, state) do
     state = State.scope_enter(state)
+    state = Enum.reduce(patterns, state, fn(pattern, state) ->
+      {_, vars} = compile_pattern(pattern, MapSet.new())
+      Enum.reduce(vars, state, &State.put_var(&2, &1))
+    end)
     {node, state}
   end
 
@@ -10,13 +14,22 @@ defmodule Prelude.Etude.Node.Clause do
     state = State.scope_exit(state)
     {node, state}
   end
-  def exit({:clause, line, patterns, guards, body}, state) do
+  def exit({:clause, _, patterns, [], _} = clause, state) do
     state = State.scope_exit(state)
+    all_vars = Enum.all?(patterns, &(elem(&1, 0) == :var))
+    if all_vars do
+      {clause, state}
+    else
+      compile_clause(clause, state)
+    end
+  end
+  def exit(clause, state) do
+    state = State.scope_exit(state)
+    compile_clause(clause, state)
+  end
 
-    {pattern, pattern_vars} = patterns
-    |> Enum.map_reduce(MapSet.new(), fn(pattern, acc) ->
-      compile_pattern(pattern, acc)
-    end)
+  defp compile_clause({:clause, line, patterns, guards, body}, state) do
+    {pattern, pattern_vars} = Enum.map_reduce(patterns, MapSet.new(), &compile_pattern/2)
     {guard, {guard_vars, state}} = compile_guards(guards, state)
 
     {arity, pattern} = maybe_wrap_pattern(pattern)
@@ -68,14 +81,9 @@ defmodule Prelude.Etude.Node.Clause do
   end
 
   def combine_clauses(clauses, line, %{module: m, function: {f, a}} = state) do
-    {matches, arity} = clauses
-    |> Enum.map_reduce(1, fn
-      ({:etude_clause, l, arity, match, scope, body}, _) ->
-        {{:tuple, l, [match, scope, body]}, arity}
-      ({:clause, _, patterns, _, _} = clause, _) ->
-        {clause, length(patterns)}
-    end)
+    {matches, {arity, state}} = Enum.map_reduce(clauses, {nil, state}, &translate_clause/2)
 
+    if arity == nil, do: throw :normal_clause
     if arity == 0, do: throw :zero_arity
 
     matches = cons(matches)
@@ -97,6 +105,19 @@ defmodule Prelude.Etude.Node.Clause do
   catch
     _, :zero_arity ->
       {clauses, state}
+    _, :normal_clause ->
+      {clauses, state}
+  end
+
+  defp translate_clause({:etude_clause, l, arity, match, scope, body}, {_, state}) do
+    {{:tuple, l, [match, scope, body]}, {arity, state}}
+  end
+  defp translate_clause({:clause, _, _, _, _} = clause, {nil, state}) do
+    {clause, {nil, state}}
+  end
+  defp translate_clause({:clause, _, _, _, _} = clause, {arity, state}) do
+    {clause, state} = compile_clause(clause, state)
+    translate_clause(clause, {arity, state})
   end
 
   defp gen_clause(1, val_var, match, state) do
@@ -150,6 +171,7 @@ defmodule Prelude.Etude.Node.Clause do
         |> erl(line)
         {call, acc}
       ({:op, line, name, arg}, acc) ->
+        name = map_op(name)
         name = escape(name, line)
         call = ~S"""
         #{'__struct__' => 'Elixir.Etude.Match.Call',
@@ -159,6 +181,7 @@ defmodule Prelude.Etude.Node.Clause do
         |> erl(line)
         {call, acc}
       ({:op, line, name, lhs, rhs}, acc) ->
+        name = map_op(name)
         name = escape(name, line)
         call = ~S"""
         #{'__struct__' => 'Elixir.Etude.Match.Call',
@@ -175,4 +198,8 @@ defmodule Prelude.Etude.Node.Clause do
         {other, acc}
     end)
   end
+
+  defp map_op(:andalso), do: :and
+  defp map_op(:orelse), do: :or
+  defp map_op(op), do: op
 end

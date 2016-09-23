@@ -37,7 +37,7 @@ defmodule Prelude.Etude.Node.Match do
     assign = ~S"""
     unquote(match) = 'Elixir.Etude.Future':cache(
       'Elixir.Etude.Future':location(
-        (unquote(match_var))(unquote(rhs), #{}),
+        'Elixir.Etude.Match.Executable':execute(unquote(match_var), unquote(rhs), #{}),
         unquote(location)
       )
     )
