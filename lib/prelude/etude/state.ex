@@ -5,12 +5,10 @@ defmodule Prelude.Etude.State do
             calls: %{},
             local_calls: %{},
             function: nil,
-            public?: false,
+    public?: false,
+    matches: %{},
     module: nil,
     var_count: 0
-
-  require Prelude.ErlSyntax
-  alias Prelude.ErlSyntax
 
   def put_call(state, module, function, args) when is_list(args) do
     put_call(state, module, function, length(args))
@@ -36,6 +34,30 @@ defmodule Prelude.Etude.State do
   def static_var?(_state, _var) do
     # TODO
     false
+  end
+
+  def scope_enter(%{scopes: scopes} = state) do
+    %{state | scopes: [MapSet.new() | scopes]}
+  end
+
+  def scope_exit(%{scopes: [_ | scopes]} = state) do
+    %{state | scopes: scopes}
+  end
+
+  def scope_vars(%{scopes: scopes}) do
+    scopes
+    |> Enum.reduce(MapSet.new(), fn(scope, acc) ->
+      MapSet.union(scope, acc)
+    end)
+  end
+
+  def put_var(%{scopes: [scope | scopes]} = state, var) do
+    %{state | scopes: [MapSet.put(scope, var) | scopes]}
+  end
+
+  def put_match(%{matches: matches} = state, match) do
+    matches = Map.put_new(matches, match, {:var, -1, :"_etude_match@#{map_size(matches)}"})
+    {Map.get(matches, match), %{state | matches: matches}}
   end
 
   def gensym(%{var_count: count} = state) do

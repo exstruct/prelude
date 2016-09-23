@@ -42,13 +42,24 @@ defmodule Prelude.ErlSyntax do
     {:integer, line, value}
   end
   def escape(value, line) when is_binary(value) do
-    {:bin, line, {:bin_element, line, {:string, to_char_list(value)}, :default, :default}}
+    {:bin, line, [{:bin_element, line, {:string, line, to_char_list(value)}, :default, :default}]}
   end
   def escape([], line) do
     {:nil, line}
   end
   def escape([argument | arguments], line) do
-    {:cons, line, argument, escape(arguments, line)}
+    {:cons, line, escape(argument, line), escape(arguments, line)}
+  end
+  def escape(map, line) when is_map(map) do
+    {:map, line,
+     :maps.fold(fn(k, v, acc) ->
+       kv = {:map_field_assoc, line, escape(k, line), escape(v, line)}
+       [kv | acc]
+     end, [], map)}
+  end
+  def escape(tuple, line) when is_tuple(tuple) do
+    items = tuple |> :erlang.tuple_to_list() |> Enum.map(&escape(&1, line))
+    {:tuple, line, items}
   end
 
   defp apply_unquote(tree, line) do
@@ -90,6 +101,17 @@ defmodule Prelude.ErlSyntax do
     {{type, line, name, arity, clauses}, acc} = enter.(node, acc)
     {clauses, acc} = traverse(clauses, acc, enter, exit)
     exit.({type, line, name, arity, clauses}, acc)
+  end
+  def traverse({:case, _, _, _} = node, acc, enter, exit) do
+    {{type, line, value, clauses}, acc} = enter.(node, acc)
+    {value, acc} = traverse(value, acc, enter, exit)
+    {clauses, acc} = traverse(clauses, acc, enter, exit)
+    exit.({type, line, value, clauses}, acc)
+  end
+  def traverse({:fun, _, clauses} = node, acc, enter, exit) do
+    {{type, line, {:clauses, clauses}}, acc} = enter.(node, acc)
+    {clauses, acc} = traverse(clauses, acc, enter, exit)
+    exit.({type, line, {:clauses, clauses}}, acc)
   end
   def traverse({:match, _, _, _} = node, acc, enter, exit) do
     {{:match, line, lhs, rhs}, acc} = enter.(node, acc)

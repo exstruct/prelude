@@ -66,4 +66,23 @@ defmodule Prelude.Test.CaseExpr do
       end
     end
   end
+
+  preludetest "elixir shadow" do
+    def test do
+      check(:ok, true, 1, 2, 3)
+    end
+
+    defp check(a,b,c,d,e) do
+      case :erlang.hd([a,b,c,d,e]) do
+        :ok ->
+          if :erlang.hd([b,c,d,e]) do
+            :ok
+          else
+            :error
+          end
+        other ->
+          other
+      end
+    end
+  end
 end

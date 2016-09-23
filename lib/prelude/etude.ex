@@ -22,6 +22,10 @@ defmodule Prelude.Etude do
   def compile(forms, _opts) do
     {module, attributes, exports, functions} = Enum.reduce(forms, {nil, [], %{}, %{}}, &partition/2)
 
+    #if Mix.env == :test do
+    #  :parse_trans_pp.pp_src(forms, '.test/#{module}.in.erl')
+    #end
+
     initial_state = %Prelude.Etude.State{
       locals: Enum.reduce(functions, %{}, fn({key, _}, acc) -> Map.put(acc, key, true) end),
       exports: exports,
@@ -54,6 +58,9 @@ defmodule Prelude.Etude do
     module = rename_module(module)
     attr = {:attribute, line, :module, module}
     {module, [attr | attributes], exports, funs}
+  end
+  defp partition({:attribute, _, :file, _}, acc) do
+    acc
   end
   defp partition(other, {module, attributes, exports, funs}) do
     {module, [other | attributes], exports, funs}
