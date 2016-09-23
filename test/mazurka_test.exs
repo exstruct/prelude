@@ -8,8 +8,8 @@ defmodule Prelude.Test.Mazurka do
       action([], %{"user" => "foo123"}, %{}, %{})
     end
 
-    param user do
-      %{id: &value,
+    param user, fn(id) ->
+      %{id: id,
         name: "Joe",
         age: 42}
     end

@@ -49,4 +49,7 @@ defmodule Prelude.Etude.Node.Call do
     |> erl(line)
     {node, state}
   end
+  def exit({:call, _, {:fun, _, _}, _} = node, state) do
+    {node, state}
+  end
 end
