@@ -3,14 +3,14 @@ defmodule Prelude.Test.Atom do
 
   preludetest "static" do
     def test() do
-      :hello
-    end
-  end
-
-  preludetest "interpolate" do
-    def test() do
-      name = "Joe"
-      :"hello, #{name}"
+      # %Etude.Chain{
+      #   future: hello("joe"),
+      #   on_ok: fn(%{name: name}) ->
+      #     name
+      #   end
+      # }
+      %{name: name} = hello("joe")
+      name
     end
   end
 end
