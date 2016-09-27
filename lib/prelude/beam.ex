@@ -12,7 +12,7 @@ defmodule Prelude.BeamFile do
   def from_record({:beam_file, module, exports, attrs, info, code}) do
     %__MODULE__{
       module: module,
-      exports: exports,
+      exports: MapSet.new(exports),
       info: info,
       attrs: attrs,
       code: code
@@ -20,7 +20,7 @@ defmodule Prelude.BeamFile do
   end
 
   def to_record(%{module: module, exports: exports, attrs: attrs, info: info, code: code}) do
-    {:beam_file, module, exports, attrs, info, code}
+    {:beam_file, module, MapSet.to_list(exports), attrs, info, code}
   end
 
   def fetch_chunks(%{beam: beam}, chunks) do

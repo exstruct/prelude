@@ -2,15 +2,27 @@ defmodule Prelude.Test.Atom do
   use Prelude.Test.Case
 
   preludetest "static" do
+    # def test(a) do
+    #   case a do
+    #     1 ->
+    #       :integer
+    #     [] ->
+    #       :list
+    #     %{} ->
+    #       :map
+    #   end
+    # end
+
     def test() do
-      # %Etude.Chain{
-      #   future: hello("joe"),
-      #   on_ok: fn(%{name: name}) ->
-      #     name
-      #   end
-      # }
-      %{name: name} = hello("joe")
-      name
+      a = bar(1)
+      fun = fn(b, c) ->
+        a + b + c
+      end
+      fun.(2, 3)
+    end
+
+    defp bar(a) do
+      a
     end
   end
 end

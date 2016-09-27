@@ -16,9 +16,11 @@ defmodule Prelude.Disassembler do
   end
 
   defp fix_exports(%{exports: exports} = beam) do
-    exports = for {n, a, _} <- exports do
+    exports = exports
+    |> Stream.map(fn({n, a, _}) ->
       {n, a}
-    end
+    end)
+    |> Enum.into(MapSet.new())
     %{beam | exports: exports}
   end
 

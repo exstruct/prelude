@@ -23,12 +23,15 @@ defmodule Prelude do
     {:module, _} = :code.ensure_loaded(name)
 
     name.test()
+    |> Etude.fork!()
     |> IO.inspect
   end
 
   def compile_beam(beam, opts \\ []) do
     beam
     |> Prelude.Disassembler.disassemble!(opts)
+    |> Prelude.Debugger.print()
+    |> Prelude.Tracker.track()
     |> Prelude.Transformer.transform(opts)
     |> Prelude.Assembler.assemble!()
   end

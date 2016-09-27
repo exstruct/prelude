@@ -13,7 +13,6 @@ defmodule Prelude.Assembler.Encoder do
   @tag_z 7
 
   def encode(code, exports, dict, beam_file) do
-    exports = MapSet.new(exports)
     encode(code, exports, dict, beam_file, [])
   end
 
@@ -81,6 +80,9 @@ defmodule Prelude.Assembler.Encoder do
            3 -> :gc_bif3
          end
     encode_op(op, [fail, live, {:extfunc, :erlang, bif, arity} | args ++ [dest]], dict)
+  end
+  defp make_op({:bs_add, fail, [src1, src2, unit], dest}, dict, _) do
+    encode_op(:bs_add, [fail, src1, src2, unit, dest], dict)
   end
   defp make_op({:test, cond, fail, src, {:list, _} = ops}, dict, _) do
     encode_op(cond, [fail, src, ops], dict)
@@ -171,8 +173,11 @@ defmodule Prelude.Assembler.Encoder do
   defp encode_arg({:fr, fr}, dict) do
     {[encode(@tag_z, 2), encode(@tag_u, fr)], dict}
   end
-  defp encode_arg({:field_flags, flags}, dict) do
+  defp encode_arg({:field_flags, flags}, dict) when is_list(flags) do
     flags = Enum.reduce(flags, 0, &(&2 ||| flag_to_bit(&1)))
+    encode_arg({:field_flags, flags}, dict)
+  end
+  defp encode_arg({:field_flags, flags}, dict) when is_integer(flags) do
     {encode(@tag_u, flags), dict}
   end
   defp encode_arg({:alloc, list}, dict) do
@@ -184,6 +189,9 @@ defmodule Prelude.Assembler.Encoder do
   end
   defp encode_arg(int, dict) when is_integer(int) do
     {encode(@tag_u, int), dict}
+  end
+  defp encode_arg(bin, dict) when is_binary(bin) do
+    encode_arg({:literal, bin}, dict)
   end
 
   defp encode_list([], dict, acc) do
