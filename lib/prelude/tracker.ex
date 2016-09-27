@@ -3,17 +3,15 @@ defmodule Prelude.Tracker do
     defstruct [op: nil,
                registers: %{},
                stack: %{},
-               heap: %{}]
-
-    defimpl Inspect do
-      def inspect(%{op: op, registers: r}, opts) do
-        @protocol.inspect(r, opts)
-      end
-    end
+               info: %{}]
   end
 
   defmodule Argument do
     defstruct [:fun, :arity, :pos]
+  end
+
+  defmodule ExtCall do
+    defstruct [:module, :fun, :arity, :args]
   end
 
   defmodule LocalCall do
@@ -24,11 +22,28 @@ defmodule Prelude.Tracker do
     defstruct [:input, :fun]
   end
 
+  defmodule Type do
+    defstruct [:type]
+  end
+
+  defmodule Not do
+    defstruct [:type]
+  end
+
   defmodule Fun do
     defstruct [:fun, :arity, :env]
   end
 
-  @pending [Argument, LocalCall, Transform]
+  defmodule Literal do
+    defstruct [:value]
+  end
+
+  defmodule PartialMap do
+    defstruct [literal: %{}, elements: []]
+  end
+
+  @pending [Argument, ExtCall, LocalCall, Transform, Type, Not]
+  @internal [Fun, Literal, PartialMap | @pending]
 
   defmacro maybe?(v) do
     quote do
@@ -38,35 +53,51 @@ defmodule Prelude.Tracker do
 
   @safe_types [:atom, :float, :integer, :literal, :list]
 
-  def track(module = %{code: code} = m) do
+  def track(%{code: code} = module) do
     code = Enum.map(code, &function(&1, module))
-    %{module | code: code}
+
+    calls = Enum.reduce(code, %{}, fn(%{calls: calls}, acc) ->
+      Map.merge(acc, calls, fn(_, v1, v2) ->
+        MapSet.union(v1, v2)
+      end)
+    end)
+
+    code = Enum.map(code, fn(%{name: name, arity: arity} = f) ->
+      %{f | calls: Map.get(calls, {name, arity}, MapSet.new())}
+    end)
+
+    %{module | typed_code: code}
   end
 
-  def function({:function, name, arity, entry, code} = fun, %{exports: exports}) do
+  def function({:function, name, arity, entry, code}, _module) do
     state = %{
       registers: %{},
       stack: %{},
-      heap: %{},
       cache: %{},
       calls: %{},
-      jumps: %{}
+      jumps: %{},
+      label: nil
     } |> put_arguments(name, arity)
 
     {ex, labels} = gather_labels(code)
 
     state = Map.put(state, :labels, labels)
 
-    jump(state, entry)
-    |> elem(1)
-    |> Map.get(:cache)
-    |> Enum.each(fn({lbl, ops}) ->
-      IO.puts "=== #{lbl} === "
-      Enum.each(ops, &IO.inspect/1)
-    end)
-    IO.puts ""
+    {ex, state} = execute(ex, [], state)
 
-    {:function, name, arity, entry, code}
+    state = jump(state, entry)
+
+    code = state |> Map.get(:cache)
+    code = code |> Map.put(:__before__, ex)
+
+    %{
+      name: name,
+      arity: arity,
+      entry: entry,
+      code: code,
+      calls: state.calls,
+      jumps: state.jumps
+    }
   end
 
   defp gather_labels(code) do
@@ -91,14 +122,17 @@ defmodule Prelude.Tracker do
 
   defp jump(%{cache: cache, labels: labels} = state, l) do
     # TODO handle cyclical jumps
+    # TODO cache based on the stack and registers so we can have the different jump typings
     case Map.fetch(cache, l) do
-      {:ok, ops} ->
-        {ops, state}
+      {:ok, _} ->
+        state
       :error ->
         case Map.fetch(labels, l) do
           {:ok, ops} ->
+            prev = state.label
+            state = Map.put(state, :label, l)
             {ops, %{cache: cache} = state} = execute(ops, [], state)
-            {ops, %{state | cache: Map.put(cache, l, ops)}}
+            %{state | cache: Map.put(cache, l, ops), label: prev}
           :error ->
             throw {:label_not_found, l}
         end
@@ -112,15 +146,15 @@ defmodule Prelude.Tracker do
     struct = new(op, state)
     {elements, ops} = consume(ops, size)
 
-    state = put_value(state, to, :erlang.make_tuple(size, nil))
+    state = put_value(state, to, %Literal{value: :erlang.make_tuple(size, nil)})
 
     state = elements
     |> Stream.with_index()
     |> Enum.reduce(state, fn({{:put, from}, i}, state) ->
-      tuple = get_value(state, to)
+      %Literal{value: tuple} = get_value(state, to)
       value = get_value(state, from)
       tuple = put_elem(tuple, i, value)
-      put_value(state, to, tuple)
+      put_value(state, to, %Literal{value: tuple})
     end)
 
     execute(ops, [struct | acc], state)
@@ -139,31 +173,54 @@ defmodule Prelude.Tracker do
     put_register(state, 0, %LocalCall{fun: fun, arity: arity, args: args})
   end
 
-  defp update_state({:bif, :element, _, args, tuple}, state) do
+  defp update_state({:call_ext, arity, {:extfunc, module, fun, arity}}, state) do
+    args = arity_range(arity) |> Enum.map(&get_register(state, &1))
+    put_register(state, 0, %ExtCall{module: module, fun: fun, arity: arity, args: args})
+  end
+
+  defp update_state({:bif, :element, _, _args, _tuple}, state) do
     # TODO
     state
   end
   defp update_state({:bif, :hd, _, [to], list}, state) do
     case get_value(state, list) do
-      [hd | _] ->
+      %Literal{value: [hd | _]} ->
         put_value(state, to, hd)
-      value ->
+      maybe?(value) ->
         put_value(state, to, %Transform{input: value, fun: &:erlang.hd/1})
     end
   end
 
   ### Tests
 
-  defp update_state({:test, _call, {:f, fail}, _args}, state) do
-    {_, state} = jump(state, fail)
-    state
+  defp update_state({:test, :bs_start_match2, {:f, fail}, [_subj, _, _, to]}, state) do
+    state = jump(state, fail)
+    put_value(state, to, %Type{type: :binary})
+  end
+  defp update_state({:test, :bs_get_integer2, {:f, fail}, [_subj, _, _, _, _field_flags, to]}, state) do
+    state = jump(state, fail)
+    put_value(state, to, %Type{type: :integer})
+  end
+  defp update_state({:test, call, {:f, fail}, [arg]}, state) do
+    # TODO Add %Not{type: type} for the fail case
+    state = jump(state, fail)
+    case get_value(state, arg) do
+      %Literal{value: value} ->
+        type = call_test(call, value)
+        put_value(state, arg, type)
+      maybe?(value) ->
+        value = %Transform{
+          input: value,
+          fun: &call_test(call, &1)
+        }
+        put_value(state, arg, value)
+    end
   end
 
   ### Indexing & jumping
 
   defp update_state({:jump, {:f, l}}, state) do
-    {_, state} = jump(state, l)
-    state
+    jump(state, l)
   end
 
   ### Moving, extracting, modifying
@@ -174,11 +231,16 @@ defmodule Prelude.Tracker do
   end
   defp update_state({:get_list, list, h_to, t_to}, state) do
     case get_value(state, list) do
-      [h | t] ->
+      %Literal{value: [h | t]} when is_list(t) ->
+        state
+        |> put_value(h_to, h)
+        |> put_value(t_to, %Literal{value: t})
+      %Literal{value: [h | t]} ->
         state
         |> put_value(h_to, h)
         |> put_value(t_to, t)
-      value ->
+      maybe?(value) ->
+        # TODO wrap hd and tl so we can handle unknown cases
         state
         |> put_value(h_to, %Transform{input: value, fun: &:erlang.hd/1})
         |> put_value(t_to, %Transform{input: value, fun: &:erlang.tl/1})
@@ -186,9 +248,10 @@ defmodule Prelude.Tracker do
   end
   defp update_state({:get_tuple_element, from, idx, to}, state) do
     case get_value(state, from) do
-      t when is_tuple(t) ->
+      %Literal{value: t} when is_tuple(t) ->
         put_value(state, to, elem(t, idx))
-      value ->
+      maybe?(value) ->
+        # TODO wrap elem so we can handle unknown cases
         put_value(state, to, %Transform{input: value, fun: &elem(&1, idx)})
     end
   end
@@ -207,8 +270,11 @@ defmodule Prelude.Tracker do
     args = arity_range(arity) |> Enum.map(&get_register(state, &1))
     case get_register(state, arity) do
       %Fun{fun: fun, arity: arity, env: env} ->
-        value = %LocalCall{fun: fun, arity: arity, args: env ++ args}
+        args = env ++ args
+        state = put_call(state, fun, arity, args)
+        value = %LocalCall{fun: fun, arity: arity, args: args}
         put_register(state, 0, value)
+      # TODO handle other cases
     end
   end
 
@@ -219,76 +285,108 @@ defmodule Prelude.Tracker do
     put_register(state, 0, value)
   end
 
+  defp update_state({:bs_append, _, _input, _, _, _, _from, _field_flags, to}, state) do
+    # TODO add better tracking
+    value = %Type{type: :binary}
+    put_value(state, to, value)
+  end
+
   ### R17
 
   defp update_state({:put_map_assoc, _, from, to, _, elements}, state) do
     case get_value(state, from) do
-      maybe?(s) ->
+      %Literal{value: map} when is_map(map) ->
+        map = assoc_map_elements(elements, map, state, fn(k, v, acc) ->
+          Map.put(acc, k, v)
+        end)
+        put_value(state, to, map)
+      maybe?(_) ->
         # TODO
         state
-      map when is_map(map) ->
-        map = assoc_map_elements(elements, map, state, fn(k, v, acc) ->
-        Map.put(acc, k, v)
-      end)
-        put_value(state, to, map)
     end
   end
-  defp update_state({:get_map_elements, {:f, fail}, from, elements}, state) do
-    {_, state} = jump(state, fail)
+  defp update_state({:get_map_elements, {:f, fail}, from, elements} = op, state) do
+    state = jump(state, fail)
     case get_value(state, from) do
-      maybe?(s) ->
-        put_map_elements(elements, state, fn(key) ->
-          %Transform{input: s, fun: &:maps.get(&1, key)}
-        end)
-      map when is_map(map) ->
+      %Literal{value: map} when is_map(map) ->
         put_map_elements(elements, state, fn(key) ->
           {:ok, value} = Map.fetch(map, key)
           value
         end)
+      maybe?(s) ->
+        put_map_elements(elements, state, fn(key) ->
+          %Transform{input: s, fun: &:maps.get(&1, key)}
+        end)
     end
   end
 
-  defp update_state(other, state) do
+  defp update_state(_other, state) do
     state
+  end
+
+  for call <- [:is_atom, :is_binary, :is_bitstring, :is_boolean, :is_float, :is_function,
+               :is_integer, :is_list, :is_map, :is_number, :is_pid, :is_port, :is_reference,
+               :is_tuple] do
+    type = call |> to_string() |> String.trim_leading("is_") |> String.to_atom()
+    defp call_test(unquote(call), value) when unquote(call)(value) do
+      value
+    end
+    defp call_test(unquote(call), _) do
+      %Type{type: unquote(type)}
+    end
+  end
+  defp call_test(:is_nonempty_list, [_ | _] = l) do
+    l
+  end
+  defp call_test(:is_nonempty_list, _) do
+    %Type{type: :list}
+  end
+  defp call_test(:is_nil, []) do
+    []
+  end
+  defp call_test(:is_nil, _) do
+    %Type{type: :list}
   end
 
   defp assoc_map_elements(elements, acc, state, update) do
     case get_value(state, elements) do
-      # TODO
-      # maybe?(s) ->
-      elements when is_list(elements) ->
-        pair_reduce(elements, acc, fn(k, from, acc) ->
+      %Literal{value: elements} when is_list(elements) ->
+        pm = pair_reduce(elements, %PartialMap{literal: acc}, fn(k, from, %PartialMap{literal: l, elements: e} = m) ->
           case get_value(state, k) do
-            maybe?(s) ->
-              # TODO
-              acc
-            key ->
+            %Literal{value: key} ->
               value = get_value(state, from)
-              update.(key, value, acc)
+              %{m | literal: update.(key, value, l)}
+            maybe?(s) ->
+              value = get_value(state, from)
+              %{m | elements: [{s, value} | e]}
           end
         end)
+        case pm do
+          %{elements: [], literal: l} ->
+            l
+          _ ->
+            pm
+        end
     end
   end
 
   defp put_map_elements(elements, state, fetch) do
     case get_value(state, elements) do
-      # TODO
-      # maybe?(s) ->
-      elements when is_list(elements) ->
+      %Literal{value: elements} when is_list(elements) ->
         pair_reduce(elements, state, fn(k, to, state) ->
           case get_value(state, k) do
+            %Literal{value: key} ->
+              put_value(state, to, fetch.(key))
             maybe?(s) ->
               value = %Transform{input: s, fun: fetch}
               put_value(state, to, value)
-            key ->
-              put_value(state, to, fetch.(key))
           end
         end)
     end
   end
 
-  defp new(op, %{registers: r, stack: s, heap: h} = state) do
-    %__MODULE__.Op{op: op, registers: r, stack: s, heap: h}
+  defp new(op, %{registers: r, stack: s}) do
+    %__MODULE__.Op{op: op, registers: r, stack: s}
   end
 
   defp put_arguments(state, f, a) do
@@ -302,12 +400,12 @@ defmodule Prelude.Tracker do
     %{state | registers: Map.put(registers, register, value)}
   end
 
-  defp get_register(%{registers: registers}, register) do
+  defp get_register(%{registers: registers, label: l}, register) do
     {:ok, value} = Map.fetch(registers, register)
     value
   rescue
     MatchError ->
-      throw {:undefined_register, register}
+      throw {:undefined_register, register, {:label, l}}
   end
 
   defp put_stack(%{stack: stack} = state, n, value) do
@@ -326,22 +424,47 @@ defmodule Prelude.Tracker do
     get_stack(state, n)
   end
   defp get_value(_, {type, value}) when type in @safe_types do
-    value
+    %Literal{value: value}
   end
   defp get_value(_, nil) do
-    []
+    %Literal{value: []}
   end
 
-  defp put_value(state, {:x, n}, value) do
+  defp put_value(state, to, v) when is_binary(v) or is_list(v) or is_number(v) or is_tuple(v) do
+    put_value_unsafe(state, to, %Literal{value: v})
+  end
+  defp put_value(state, to, map) when is_map(map) do
+    put_value_unsafe(state, to, maybe_wrap_map(map))
+  end
+  defp put_value(state, to, value) do
+    put_value_unsafe(state, to, value)
+  end
+
+  defp put_value_unsafe(state, {:x, n}, value) do
     put_register(state, n, value)
   end
-  defp put_value(state, {:y, n}, value) do
+  defp put_value_unsafe(state, {:y, n}, value) do
     put_stack(state, n, value)
   end
 
+  defp maybe_wrap_map(map) do
+    case map do
+      %struct{} when struct in @internal ->
+        map
+      _ ->
+        %Literal{value: map}
+    end
+  end
+
   defp put_call(%{calls: calls} = state, fun, arity, args) do
-    calls = Map.update(calls, {fun, arity}, [args], &[args | &1])
-    %{state | calls: calls}
+    key = {fun, arity}
+    case Map.fetch(calls, key) do
+      :error ->
+        %{state | calls: Map.put(calls, key, MapSet.new([args]))}
+      {:ok, prev} ->
+        prev = MapSet.put(prev, args)
+        %{state | calls: Map.put(calls, key, prev)}
+    end
   end
 
   defp arity_range(0) do
@@ -360,18 +483,11 @@ defmodule Prelude.Tracker do
   end
 
   defp pair_reduce(list, acc, fun)
-  defp pair_reduce([], acc, fun) do
+  defp pair_reduce([], acc, _fun) do
     acc
   end
   defp pair_reduce([a, b | list], acc, fun) do
     acc = fun.(a, b, acc)
     pair_reduce(list, acc, fun)
   end
-
-  # defp pair_map(list, fun) do
-  #   pair_reduce(list, [], fn(a, b, acc) ->
-  #     [fun.(a, b) | acc]
-  #   end)
-  #   |> :lists.reverse()
-  # end
 end

@@ -20,19 +20,16 @@ defmodule Prelude do
     |> Path.join("#{name}.beam")
     |> File.write!(beam_file)
 
-    {:module, _} = :code.ensure_loaded(name)
-
-    name.test()
-    |> Etude.fork!()
-    |> IO.inspect
+    :ok
   end
 
   def compile_beam(beam, opts \\ []) do
     beam
     |> Prelude.Disassembler.disassemble!(opts)
-    |> Prelude.Debugger.print()
+    # |> Prelude.Debugger.print()
     |> Prelude.Tracker.track()
-    |> Prelude.Transformer.transform(opts)
+    |> Prelude.Status.Simple.transform()
+    # |> Prelude.Transformer.transform(opts)
     |> Prelude.Assembler.assemble!()
   end
 end

@@ -27,7 +27,7 @@ defmodule Prelude.Mixfile do
     [{:etude, path: "../etude"},
      {:excheck, "~> 0.3.0", only: [:dev, :test, :bench]},
      {:triq, github: "krestenkrab/triq", only: [:dev, :test, :bench]},
-     {:benchfella, "~> 0.2.0", only: [:dev, :test, :bench]},
+     {:eministat, github: "jlouis/eministat", only: [:dev, :test, :bench]},
      {:parse_trans, "~> 2.9.0", only: [:dev, :test, :bench]},
      {:mix_test_watch, "~> 0.2", only: :dev},
      {:mazurka, "~> 1.0.0", only: [:test]},

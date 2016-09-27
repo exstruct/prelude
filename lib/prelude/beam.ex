@@ -4,6 +4,7 @@ defmodule Prelude.BeamFile do
              :info,
              :attrs,
              :code,
+             :typed_code,
              :num_labels,
              :file,
              :beam,
@@ -21,6 +22,16 @@ defmodule Prelude.BeamFile do
 
   def to_record(%{module: module, exports: exports, attrs: attrs, info: info, code: code}) do
     {:beam_file, module, MapSet.to_list(exports), attrs, info, code}
+  end
+
+  def export(beam_file) do
+    %{name: module,
+      exports: exports,
+      attrs: attrs,
+      code: code,
+      num_labels: num_labels
+    } = beam_file
+    {module, MapSet.to_list(exports), attrs, code, num_labels}
   end
 
   def fetch_chunks(%{beam: beam}, chunks) do
