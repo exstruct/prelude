@@ -16,7 +16,7 @@ defmodule Test.Prelude.CaseExpr do
 
   preludetest "if/else" do
     def test() do
-      value = ok(true)
+      value = ok(false)
       if value do
         "truthy"
       else

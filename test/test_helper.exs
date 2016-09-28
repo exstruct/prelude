@@ -44,6 +44,16 @@ defmodule Test.Prelude.Case do
     end
   end
 
+  def error(name) do
+    if future?() do
+      Etude.wrap(fn ->
+        throw name
+      end)
+    else
+      throw name
+    end
+  end
+
   defp future?() do
     Process.get(__MODULE__)
   end
@@ -61,6 +71,9 @@ defmodule Test.Prelude.Case do
     rescue
       e ->
         e
+    catch
+      :throw, e ->
+        {__MODULE__.THROW, e}
     after
       Process.delete(__MODULE__)
     end

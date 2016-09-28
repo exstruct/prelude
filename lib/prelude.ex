@@ -27,9 +27,9 @@ defmodule Prelude do
     beam
     |> Prelude.Disassembler.disassemble!(opts)
     # |> Prelude.Debugger.print()
-    |> Prelude.Tracker.track()
-    |> Prelude.Status.Simple.transform()
-    # |> Prelude.Transformer.transform(opts)
+    # |> Prelude.Tracker.track()
+    # |> Prelude.Status.Simple.transform()
+    # |> Prelude.Etude.transform()
     |> Prelude.Assembler.assemble!()
   end
 end

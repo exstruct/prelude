@@ -17,10 +17,26 @@ defmodule Test.Prelude.Call do
     end
   end
 
-  preludetest "dynamic" do
+  preludetest "dynamic apply" do
     def test() do
-      module = ok(:erlang)
-      module.hd([1])
+      module = ok(Enum)
+      module.concat([1], [2])
+      |> ok()
+    end
+  end
+
+  preludetest "dynamic apply last" do
+    def test() do
+      module = ok(Enum)
+      module.concat([1], [2])
+    end
+  end
+
+  preludetest "unused return value" do
+    def test() do
+      error("Joe")
+
+      ok("Robert")
     end
   end
 end

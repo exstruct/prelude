@@ -23,6 +23,7 @@ defmodule Prelude.Assembler do
   defp beam_asm(code, %{file: source} = beam_file) do
     %{'Abst' => abst} = BeamFile.get_chunks(beam_file, ['Abst'])
     {:ok, code} = :beam_asm.module(code, abst, source, [])
+    # TODO add ExDc chunk
     code
   end
 
@@ -70,9 +71,21 @@ defmodule Prelude.Assembler do
         {:test, :bs_start_match2, fail, live, [reg, max], ms}
       ({:test, :bs_get_integer2, fail, [ctx, live, size, unit, ff, dst]}) ->
         {:test, :bs_get_integer2, fail, live, [ctx, size, unit, ff], dst}
+      ({:test, :bs_get_float2, fail, [ctx, live, size, unit, ff, dst]}) ->
+        {:test, :bs_get_float2, fail, live, [ctx, size, unit, ff], dst}
+      ({:test, :bs_get_binary2, fail, [ctx, live, size, unit, ff, dst]}) ->
+        {:test, :bs_get_binary2, fail, live, [ctx, size, unit, ff], dst}
+      ({:test, utf, fail, [ctx, live, ff, dst]}) when utf in [:bs_get_utf8, :bs_get_utf16, :bs_get_utf32] ->
+        {:test, utf, fail, live, [ctx, ff], dst}
       ({:make_fun2, {^m, f, a}, index, uniq, num_free} = op) ->
         {:ok, l} = Map.fetch(labels, {f, a})
         {:make_fun2, {:f, l}, index, uniq, num_free}
+      ({:bif, bif, _fail, [], reg}) ->
+        {:bif, bif, {:f, 0}, [], reg}
+      ({:arithfbif, bif, fail, args, reg}) ->
+        {:bif, bif, fail, args, reg}
+      ({:raise, fail, [reg1, reg2], reg3}) ->
+        {:bif, :raise, fail, [reg1, reg2], reg3}
       (op) ->
         op
     end)
@@ -94,6 +107,10 @@ defmodule Prelude.Assembler do
     ops = Enum.map(ops, fn
       ({:bs_init2, fail, size, words, reg, ff, dst}) ->
         {:bs_init2, fail, size, words, reg, encode_ff(ff), dst}
+      ({:bs_put_integer, fail, size, u, ff, src}) ->
+        {:bs_put_integer, fail, size, u, encode_ff(ff), src}
+      ({:bs_put_float, fail, size, u, ff, src}) ->
+        {:bs_put_float, fail, size, u, encode_ff(ff), src}
       ({:bs_put_binary, fail, size, u, ff, src}) ->
         {:bs_put_binary, fail, size, u, encode_ff(ff), src}
       ({:bs_append, fail, size, extra, live, unit, bin, ff, dst}) ->
@@ -102,6 +119,18 @@ defmodule Prelude.Assembler do
         {:test, :bs_match_string, fail, [reg, size, {:string, to_charlist(string)}]}
       ({:test, :bs_get_integer2, fail, live, [ctx, size, unit, ff], dst}) ->
         {:test, :bs_get_integer2, fail, live, [ctx, size, unit, encode_ff(ff)], dst}
+      ({:test, :bs_get_float2, fail, live, [ctx, size, unit, ff], dst}) ->
+        {:test, :bs_get_float2, fail, live, [ctx, size, unit, encode_ff(ff)], dst}
+      ({:test, :bs_get_binary2, fail, live, [ctx, size, unit, ff], dst}) ->
+        {:test, :bs_get_binary2, fail, live, [ctx, size, unit, encode_ff(ff)], dst}
+      ({:test, :bs_skip_bits2, fail, [ctx, size, unit, ff]}) ->
+        {:test, :bs_skip_bits2, fail, [ctx, size, unit, encode_ff(ff)]}
+      ({:test, utf, fail, live, [ctx, ff], dst}) when utf in [:bs_get_utf8, :bs_get_utf16, :bs_get_utf32] ->
+        {:test, utf, fail, live, [ctx, encode_ff(ff)], dst}
+      ({:test, utf, fail, [reg, live, ff]}) when utf in [:bs_skip_utf8, :bs_skip_utf16, :bs_skip_utf32] ->
+        {utf, fail, reg, live, encode_ff(ff)}
+      ({utf, fail, ff, reg}) when utf in [:bs_put_utf8, :bs_put_utf16, :bs_put_utf32] ->
+        {utf, fail, encode_ff(ff), reg}
       (op) ->
         op
     end)

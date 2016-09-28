@@ -14,4 +14,11 @@ defmodule Test.Prelude.Atom do
       :"#{a}"
     end
   end
+
+  preludetest "ok construct" do
+    def test() do
+      a = ok(123)
+      :"#{a}"
+    end
+  end
 end
